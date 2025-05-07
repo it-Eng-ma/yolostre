@@ -1,8 +1,7 @@
-# requirements.txt
 streamlit>=1.22.0
 ultralytics==8.0.98
-opencv-python-headless>=4.5.4.60  # Use headless OpenCV
-numpy>=1.23.5
+opencv-python-headless==4.5.4.60  # Pinned version
+numpy==1.23.5  # Pinned for compatibility
 Pillow>=10.0.0
-torch>=2.0.0
-onnxruntime
+torch==2.0.0  # Pinned version
+onnxruntime==1.15.1  # Pinned version
