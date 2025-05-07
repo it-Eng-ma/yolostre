@@ -6,7 +6,7 @@ import cv2
 import os
 
 # Load the model (keep the model file in your GitHub repo)
-model = YOLO("/yolostr/cardmg.pt")  # Ensure this file exists in your repo
+model = YOLO("yolostr/cardmg.pt")  # Ensure this file exists in your repo
 
 st.title("Car Damage Detection")
 
