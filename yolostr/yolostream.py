@@ -17,7 +17,7 @@ CLASS_NAMES = {
 }
 
 # Load PyTorch model
-MODEL_PATH = "cardmg.pt"  # Ensure this is in your root directory
+MODEL_PATH = "yolostr/cardmg.pt"  # Ensure this is in your root directory
 try:
     model = YOLO(MODEL_PATH)
     st.success("Modèle chargé avec succès!")
