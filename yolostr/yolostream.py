@@ -4,9 +4,27 @@ import tempfile
 from ultralytics import YOLO
 import cv2
 import os
+import numpy as np
+import requests
 
-# Load the model (keep the model file in your GitHub repo)
-model = YOLO("yolostr/cardmg.pt")  # Ensure this file exists in your repo
+# Define model path and download URL
+model_path = "yolostr/cardmg.pt"
+model_url = "https://github.com/it-Eng-ma/yolostre/raw/main/yolostr/cardmg.pt"
+
+# Download the model if it doesn't exist
+if not os.path.exists(model_path):
+    os.makedirs("yolostr", exist_ok=True)
+    with st.spinner("Downloading model..."):
+        response = requests.get(model_url)
+        if response.status_code == 200:
+            with open(model_path, "wb") as f:
+                f.write(response.content)
+        else:
+            st.error(f"Failed to download model. HTTP status code: {response.status_code}")
+            st.stop()
+
+# Load the model
+model = YOLO(model_path)
 
 st.title("Car Damage Detection")
 
@@ -53,3 +71,6 @@ if img_file is not None:
 
     # Clean up temp file
     os.unlink(tmp_path)
+
+
+
