@@ -1,36 +1,47 @@
 import streamlit as st
 from PIL import Image
-import tempfile
 import cv2
 import numpy as np
 import os
 import onnxruntime as ort
 
-# Configuration
-MODEL_PATH = "yolostr/cardmg.onnx"
+# Configuration - Updated with your actual class names in French
 CLASS_NAMES = {
-    0: "Front Damage",
-    1: "Rear Damage",
-    2: "Side Damage",
-    3: "Window Crack"
+    0: "porte endommagée",
+    1: "fenêtre endommagée", 
+    2: "phare endommagé",
+    3: "rétroviseur endommagé",
+    4: "bosse",
+    5: "capot endommagé",
+    6: "pare-chocs endommagé",
+    7: "pare-brise endommagé"
 }
 
 # Load ONNX model
+MODEL_PATH = "yolostr/cardmg.onnx"
+if not os.path.exists(MODEL_PATH):
+    st.error(f"Model file not found at: {MODEL_PATH}")
+    st.stop()
+
 session = ort.InferenceSession(MODEL_PATH)
 input_name = session.get_inputs()[0].name
 
-st.title("Car Damage Detection")
+st.title("Détection de Dommages sur Véhicule")
 
 def preprocess_image(image, target_size=640):
-    # Convert PIL to OpenCV format
-    image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    """Convert and normalize image for YOLO model"""
+    # Convert PIL to OpenCV format (BGR)
+    img_array = np.array(image)
+    if len(img_array.shape) == 2:  # Grayscale
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
+    else:  # RGB
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
     
     # Resize maintaining aspect ratio
-    h, w = image.shape[:2]
+    h, w = img_array.shape[:2]
     scale = min(target_size / h, target_size / w)
     nh, nw = int(h * scale), int(w * scale)
-    
-    resized = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    resized = cv2.resize(img_array, (nw, nh))
     
     # Pad to square
     padded = np.full((target_size, target_size, 3), 114, dtype=np.uint8)
@@ -38,82 +49,90 @@ def preprocess_image(image, target_size=640):
     
     # Normalize and transpose
     img = padded.astype(np.float32) / 255.0
-    img = img.transpose(2, 0, 1)[np.newaxis, :]  # (1, 3, 640, 640)
-    
-    return img, scale, (nw, nh)
+    return np.transpose(img, (2, 0, 1))[np.newaxis, :], scale, (w, h)  # Return original dimensions for scaling
 
-def postprocess(outputs, scale, original_size, conf_thresh=0.3):
-    # Assuming model output is (1, 84, 8400)
-    preds = outputs[0][0]  # Remove batch dimension
-    boxes = []
-    
-    # Get number of classes from CLASS_NAMES
-    num_classes = len(CLASS_NAMES)
-    
-    # Split predictions
-    for pred in preds.T:  # Transpose to (8400, 84)
-        *xywh, conf, class_scores = np.split(pred, [4, 5, 5+num_classes])
-        cls_id = np.argmax(class_scores)
-        cls_conf = np.max(class_scores)
+def postprocess(outputs, scale, original_size, conf_thresh=0.25):
+    """Process YOLOv8 ONNX model output"""
+    try:
+        # Output shape: [1, 84, 8400] (x_center, y_center, w, h, conf, class_scores...)
+        predictions = outputs[0][0]  # Remove batch dimension
         
-        if conf * cls_conf > conf_thresh:
-            x_center, y_center, w, h = xywh
-            x1 = int((x_center - w/2) / scale)
-            y1 = int((y_center - h/2) / scale)
-            x2 = int((x_center + w/2) / scale)
-            y2 = int((y_center + h/2) / scale)
+        boxes = []
+        for pred in predictions.T:  # Transpose to [8400, 84]
+            *xywh, conf, class_scores = np.split(pred, [4, 5, 5 + len(CLASS_NAMES)])
+            cls_id = np.argmax(class_scores)
+            cls_conf = class_scores[cls_id]
+            total_conf = conf * cls_conf
             
-            # Clip coordinates to image dimensions
-            x1 = max(0, min(x1, original_size[0]))
-            y1 = max(0, min(y1, original_size[1]))
-            x2 = max(0, min(x2, original_size[0]))
-            y2 = max(0, min(y2, original_size[1]))
-            
-            boxes.append((x1, y1, x2, y2, cls_id, float(conf * cls_conf)))
+            if total_conf > conf_thresh:
+                # Convert from center to corner coordinates
+                x_center, y_center, w, h = xywh
+                x1 = int((x_center - w/2) * original_size[0] / scale)
+                y1 = int((y_center - h/2) * original_size[1] / scale)
+                x2 = int((x_center + w/2) * original_size[0] / scale)
+                x2 = min(x2, original_size[0])  # Clip to image bounds
+                y2 = int((y_center + h/2) * original_size[1] / scale)
+                y2 = min(y2, original_size[1])
+                
+                boxes.append({
+                    "coords": [x1, y1, x2, y2],
+                    "class_id": int(cls_id),
+                    "confidence": float(total_conf),
+                    "class_name": CLASS_NAMES.get(int(cls_id), f"inconnu {cls_id}")
+                })
+        
+        return boxes
     
-    return boxes
+    except Exception as e:
+        st.error(f"Erreur de post-traitement: {str(e)}")
+        return []
 
 # File uploader
-img_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+img_file = st.file_uploader("Télécharger une image", type=["jpg", "jpeg", "png"])
 
-if img_file is not None:
+if img_file:
     try:
-        # Read and preprocess
-        image = Image.open(img_file)
-        input_tensor, scale, size = preprocess_image(image)
+        # Read image
+        image = Image.open(img_file).convert("RGB")
         original_w, original_h = image.size
         
+        # Preprocess
+        input_tensor, scale, original_size = preprocess_image(image)
+        
         # Inference
-        outputs = session.run(None, {input_name: input_tensor})
+        outputs = session.run([output_name], {input_name: input_tensor})
         
         # Postprocess
-        boxes = postprocess(outputs, scale, (original_w, original_h))
+        detections = postprocess(outputs, scale, (original_w, original_h))
         
         # Draw results
-        image_np = np.array(image)
-        for x1, y1, x2, y2, cls_id, score in boxes:
-            # Draw rectangle
-            cv2.rectangle(image_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        img_display = np.array(image)
+        for det in detections:
+            x1, y1, x2, y2 = det["coords"]
             
-            # Get class name
-            class_name = CLASS_NAMES.get(cls_id, f"Unknown {cls_id}")
+            # Draw rectangle
+            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
             
             # Draw label
-            label = f"{class_name} {score:.2f}"
-            cv2.putText(image_np, label, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            label = f"{det['class_name']} {det['confidence']:.2f}"
+            cv2.putText(img_display, label, (x1, y1 - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         
         # Display
-        st.image(image_np, caption="Detected Damages", use_column_width=True)
+        st.image(img_display, caption="Détection des dommages", use_column_width=True)
         
         # Show detections
-        if boxes:
-            st.subheader("Detected Damages:")
-            for x1, y1, x2, y2, cls_id, score in boxes:
-                class_name = CLASS_NAMES.get(cls_id, f"Unknown {cls_id}")
-                st.write(f"- {class_name} (Confidence: {score:.2f})")
+        if detections:
+            st.subheader("Dommages détectés:")
+            for det in detections:
+                st.write(f"- {det['class_name']} (confiance: {det['confidence']:.2f})")
         else:
-            st.write("No damages detected.")
+            st.write("Aucun dommage détecté.")
             
     except Exception as e:
-        st.error(f"Error processing image: {str(e)}")
+        st.error(f"Erreur de traitement: {str(e)}")
+
+
+
+
+
