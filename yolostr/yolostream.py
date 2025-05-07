@@ -26,7 +26,7 @@ if not os.path.exists(MODEL_PATH):
 try:
     session = ort.InferenceSession(MODEL_PATH)
     input_name = session.get_inputs()[0].name
-    output_name = session.get_outputs()[0].name  # Properly define output_name
+    output_name = session.get_outputs()[0].name
 except Exception as e:
     st.error(f"Erreur de chargement du modèle: {str(e)}")
     st.stop()
@@ -53,13 +53,22 @@ def preprocess_image(image, target_size=640):
     return np.transpose(img, (2, 0, 1))[np.newaxis, :], scale, (w, h)
 
 def postprocess(outputs, scale, original_size, conf_thresh=0.25):
-    """Process YOLOv8 ONNX model output"""
+    """Process YOLOv8 ONNX model output with empty sequence handling"""
     try:
         predictions = outputs[0][0]  # Shape: [84, 8400]
         boxes = []
         
+        # Check if we have valid predictions
+        if predictions.size == 0:
+            return boxes
+            
         for pred in predictions.T:  # [8400, 84]
             *xywh, conf, class_scores = np.split(pred, [4, 5, 5 + len(CLASS_NAMES)])
+            
+            # Handle empty class scores
+            if len(class_scores) == 0:
+                continue
+                
             cls_id = np.argmax(class_scores)
             total_conf = conf * class_scores[cls_id]
             
@@ -95,7 +104,7 @@ if img_file:
         # Preprocess
         input_tensor, scale, original_size = preprocess_image(image)
         
-        # Inference - now using properly defined output_name
+        # Inference
         outputs = session.run([output_name], {input_name: input_tensor})
         
         # Postprocess
@@ -110,14 +119,15 @@ if img_file:
             cv2.putText(img_display, label, (x1, y1 - 10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         
-        st.image(img_display, caption="Résultats de détection", use_column_width=True)
+        # Updated to use_container_width instead of use_column_width
+        st.image(img_display, caption="Résultats de détection", use_container_width=True)
         
         if detections:
             st.subheader("Dommages détectés:")
             for det in sorted(detections, key=lambda x: x["confidence"], reverse=True):
                 st.write(f"- {det['class_name']} (confiance: {det['confidence']:.2f})")
         else:
-            st.warning("Aucun dommage détecté")
+            st.warning("Aucun dommage détecté - Essayez avec une image plus claire ou sous un angle différent")
             
     except Exception as e:
         st.error(f"Erreur de traitement: {str(e)}")
