@@ -17,7 +17,7 @@ CLASS_NAMES = {
 }
 
 # Load PyTorch model
-MODEL_PATH = "yolostr/cardmg.pt"  # Ensure this is in your root directory
+MODEL_PATH = "yolostr/cardmg.pt"  # Model path
 try:
     model = YOLO(MODEL_PATH)
     st.success("Modèle chargé avec succès!")
@@ -27,33 +27,40 @@ except Exception as e:
 
 st.title("Détection de Dommages sur Véhicule")
 
-def draw_detections(image, results):
-    """Draw detection boxes on image"""
+def draw_detections(image, results, min_confidence=0.85):
+    """Draw detection boxes on image with minimum confidence"""
     img_display = image.copy()
+    detections = []
     
     for result in results:
         for box in result.boxes:
-            # Get box coordinates
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            
-            # Get class and confidence
-            cls_id = int(box.cls)
             conf = float(box.conf)
-            class_name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
-            
-            # Draw rectangle
-            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            
-            # Draw label
-            label = f"{class_name} {conf:.2f}"
-            cv2.putText(img_display, label, (x1, y1 - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            if conf >= min_confidence:
+                # Get box coordinates
+                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                
+                # Get class info
+                cls_id = int(box.cls)
+                class_name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
+                
+                # Draw rectangle
+                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                
+                # Draw label
+                label = f"{class_name} {conf:.2f}"
+                cv2.putText(img_display, label, (x1, y1 - 10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                
+                detections.append({
+                    "class_name": class_name,
+                    "confidence": conf,
+                    "coords": [x1, y1, x2, y2]
+                })
     
-    return img_display
+    return img_display, detections
 
-# File uploader with confidence threshold
+# File uploader
 img_file = st.file_uploader("Télécharger une image de véhicule", type=["jpg", "jpeg", "png"])
-conf_threshold = st.slider("Seuil de confiance", 0.01, 1.0, 0.25, 0.01)
 
 if img_file:
     try:
@@ -61,43 +68,35 @@ if img_file:
         image = Image.open(img_file).convert("RGB")
         img_array = np.array(image)
         
-        # Perform detection
+        # Perform detection with default confidence (0.25 to catch all possible detections)
         results = model.predict(
             source=img_array,
-            conf=conf_threshold,
+            conf=0.25,  # Low initial threshold to catch all possible detections
             imgsz=640,
-            device='cpu'  # Use 'cuda' if GPU available
+            device='cpu'
         )
         
-        # Draw and display results
-        annotated_image = draw_detections(img_array, results)
-        st.image(annotated_image, caption="Résultats de détection", use_container_width=True)
+        # Draw and display results (filtering for ≥85% confidence)
+        annotated_image, filtered_detections = draw_detections(img_array, results, min_confidence=0.85)
+        st.image(annotated_image, caption="Résultats de détection (confiance ≥85%)", use_container_width=True)
         
-        # List detections
-        detections = []
-        for result in results:
-            for box in result.boxes:
-                cls_id = int(box.cls)
-                detections.append({
-                    "class_name": CLASS_NAMES.get(cls_id, f"inconnu {cls_id}"),
-                    "confidence": float(box.conf),
-                    "coords": box.xyxy[0].tolist()
-                })
-        
-        if detections:
-            st.subheader("Dommages détectés:")
-            for det in sorted(detections, key=lambda x: x["confidence"], reverse=True):
+        # Display filtered detections
+        if filtered_detections:
+            st.subheader("Dommages détectés (confiance ≥85%):")
+            for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
                 st.write(f"- {det['class_name']} (confiance: {det['confidence']:.2f})")
         else:
-            st.warning("Aucun dommage détecté - Essayez avec:")
-            st.write("- Une image plus claire")
-            st.write("- Un angle différent")
-            st.write("- Un seuil de confiance plus bas")
+            st.warning("Aucun dommage détecté avec une confiance ≥85%")
+            st.info("Suggestions:")
+            st.write("- Essayez avec une image plus claire")
+            st.write("- Prenez la photo sous un angle différent")
+            st.write("- Vérifiez que les dommages sont visibles")
             
         # Debug info
         if st.checkbox("Afficher les informations de débogage"):
-            st.write("Résultats bruts:", results[0].boxes)
-            st.write("Nombre de détections:", len(detections))
+            st.write("Nombre total de détections:", len(results[0].boxes))
+            st.write("Détections filtrées (≥85%):", len(filtered_detections))
+            st.write("Exemple de résultat brut:", results[0].boxes[0] if len(results[0].boxes) > 0 else "Aucune")
             
     except Exception as e:
         st.error(f"Erreur de traitement: {str(e)}")
