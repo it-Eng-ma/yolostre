@@ -1,88 +1,117 @@
 import streamlit as st
 from PIL import Image
-import tempfile
 import cv2
 import numpy as np
-import os
 import onnxruntime as ort
 
-# Set model path
-model_path = "yolostr/cardmg.onnx"
+# Configuration
+MODEL_PATH = "yolostr/cardmg.onnx"
+CLASS_NAMES = {
+    0: "Front Damage",
+    1: "Rear Damage",
+    2: "Side Damage",
+    3: "Window Crack"
+}
 
 # Load ONNX model
-session = ort.InferenceSession(model_path)
+session = ort.InferenceSession(MODEL_PATH)
 input_name = session.get_inputs()[0].name
-output_name = session.get_outputs()[0].name
 
 st.title("Car Damage Detection")
 
-# Upload image
-img_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-
 def preprocess_image(image, target_size=640):
-    # Resize and pad image to square
+    # Convert PIL to OpenCV format
+    image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    
+    # Resize maintaining aspect ratio
     h, w = image.shape[:2]
-    scale = target_size / max(h, w)
+    scale = min(target_size / h, target_size / w)
     nh, nw = int(h * scale), int(w * scale)
-    resized = cv2.resize(image, (nw, nh))
+    
+    resized = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    
+    # Pad to square
     padded = np.full((target_size, target_size, 3), 114, dtype=np.uint8)
     padded[:nh, :nw] = resized
-
-    # Normalize to 0-1 and transpose to (1, 3, 640, 640)
+    
+    # Normalize and transpose
     img = padded.astype(np.float32) / 255.0
-    img = np.transpose(img, (2, 0, 1))[np.newaxis, :]
+    img = img.transpose(2, 0, 1)[np.newaxis, :]  # (1, 3, 640, 640)
+    
     return img, scale, (nw, nh)
 
-def postprocess(outputs, scale, size, conf_thresh=0.3, iou_thresh=0.5):
-    # YOLOv8 ONNX output format: [batch, num_preds, 85] — [x, y, w, h, conf, class scores...]
-    preds = outputs[0][0]  # remove batch dim
+def postprocess(outputs, scale, original_size, conf_thresh=0.3):
+    # Assuming model output is (1, 84, 8400)
+    preds = outputs[0][0]  # Remove batch dimension
     boxes = []
-    for pred in preds:
-        conf = pred[4]  # Confidence score
-        cls_conf = np.max(pred[5:])  # Highest class confidence score
-        cls_id = np.argmax(pred[5:])  # Class ID with the highest score
-
-        if conf * cls_conf > conf_thresh:  # Apply threshold for confidence score
-            cx, cy, w, h = pred[:4]  # Get center coordinates and dimensions of the box
-            x1 = int((cx - w / 2) * size[0] / scale)
-            y1 = int((cy - h / 2) * size[1] / scale)
-            x2 = int((cx + w / 2) * size[0] / scale)
-            y2 = int((cy + h / 2) * size[1] / scale)
-
-            # Add the detected box to the list
-            boxes.append((x1, y1, x2, y2, int(cls_id), float(conf * cls_conf)))
+    
+    # Get number of classes from CLASS_NAMES
+    num_classes = len(CLASS_NAMES)
+    
+    # Split predictions
+    for pred in preds.T:  # Transpose to (8400, 84)
+        *xywh, conf, class_scores = np.split(pred, [4, 5, 5+num_classes])
+        cls_id = np.argmax(class_scores)
+        cls_conf = np.max(class_scores)
+        
+        if conf * cls_conf > conf_thresh:
+            x_center, y_center, w, h = xywh
+            x1 = int((x_center - w/2) / scale)
+            y1 = int((y_center - h/2) / scale)
+            x2 = int((x_center + w/2) / scale)
+            y2 = int((y_center + h/2) / scale)
+            
+            # Clip coordinates to image dimensions
+            x1 = max(0, min(x1, original_size[0]))
+            y1 = max(0, min(y1, original_size[1]))
+            x2 = max(0, min(x2, original_size[0]))
+            y2 = max(0, min(y2, original_size[1]))
+            
+            boxes.append((x1, y1, x2, y2, cls_id, float(conf * cls_conf)))
+    
     return boxes
 
+# File uploader
+img_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+
 if img_file is not None:
-    # Read and convert image
-    image = Image.open(img_file).convert("RGB")
-    image_np = np.array(image)
-
-    # Preprocess image
-    input_tensor, scale, size = preprocess_image(image_np)
-
-    # Run inference
-    outputs = session.run([output_name], {input_name: input_tensor})
-
-    # Debug: Check the shape of the output
-    print("Output shape:", outputs[0].shape)
-
-    # Postprocess predictions
-    boxes = postprocess(outputs, scale, size)
-
-    # Annotate image
-    for x1, y1, x2, y2, cls_id, score in boxes:
-        cv2.rectangle(image_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        label = f"Damage {cls_id} ({score:.2f})"
-        cv2.putText(image_np, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
-
-    # Display result
-    st.image(image_np, caption="Detected Damages", use_column_width=True)
-
-    if boxes:
-        st.subheader("Detected Damage Boxes:")
+    try:
+        # Read and preprocess
+        image = Image.open(img_file)
+        input_tensor, scale, size = preprocess_image(image)
+        original_w, original_h = image.size
+        
+        # Inference
+        outputs = session.run(None, {input_name: input_tensor})
+        
+        # Postprocess
+        boxes = postprocess(outputs, scale, (original_w, original_h))
+        
+        # Draw results
+        image_np = np.array(image)
         for x1, y1, x2, y2, cls_id, score in boxes:
-            st.write(f"- Class {cls_id} at [{x1}, {y1}, {x2}, {y2}] with confidence {score:.2f}")
-    else:
-        st.write("No damages detected.")
-
+            # Draw rectangle
+            cv2.rectangle(image_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # Get class name
+            class_name = CLASS_NAMES.get(cls_id, f"Unknown {cls_id}")
+            
+            # Draw label
+            label = f"{class_name} {score:.2f}"
+            cv2.putText(image_np, label, (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        
+        # Display
+        st.image(image_np, caption="Detected Damages", use_column_width=True)
+        
+        # Show detections
+        if boxes:
+            st.subheader("Detected Damages:")
+            for x1, y1, x2, y2, cls_id, score in boxes:
+                class_name = CLASS_NAMES.get(cls_id, f"Unknown {cls_id}")
+                st.write(f"- {class_name} (Confidence: {score:.2f})")
+        else:
+            st.write("No damages detected.")
+            
+    except Exception as e:
+        st.error(f"Error processing image: {str(e)}")
