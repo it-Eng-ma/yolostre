@@ -38,15 +38,18 @@ def postprocess(outputs, scale, size, conf_thresh=0.3, iou_thresh=0.5):
     preds = outputs[0][0]  # remove batch dim
     boxes = []
     for pred in preds:
-        conf = pred[4]
-        cls_conf = np.max(pred[5:])
-        cls_id = np.argmax(pred[5:])
-        if conf * cls_conf > conf_thresh:
-            cx, cy, w, h = pred[:4]
+        conf = pred[4]  # Confidence score
+        cls_conf = np.max(pred[5:])  # Highest class confidence score
+        cls_id = np.argmax(pred[5:])  # Class ID with the highest score
+
+        if conf * cls_conf > conf_thresh:  # Apply threshold for confidence score
+            cx, cy, w, h = pred[:4]  # Get center coordinates and dimensions of the box
             x1 = int((cx - w / 2) * size[0] / scale)
             y1 = int((cy - h / 2) * size[1] / scale)
             x2 = int((cx + w / 2) * size[0] / scale)
             y2 = int((cy + h / 2) * size[1] / scale)
+
+            # Add the detected box to the list
             boxes.append((x1, y1, x2, y2, int(cls_id), float(conf * cls_conf)))
     return boxes
 
@@ -60,6 +63,9 @@ if img_file is not None:
 
     # Run inference
     outputs = session.run([output_name], {input_name: input_tensor})
+
+    # Debug: Check the shape of the output
+    print("Output shape:", outputs[0].shape)
 
     # Postprocess predictions
     boxes = postprocess(outputs, scale, size)
@@ -79,3 +85,4 @@ if img_file is not None:
             st.write(f"- Class {cls_id} at [{x1}, {y1}, {x2}, {y2}] with confidence {score:.2f}")
     else:
         st.write("No damages detected.")
+
