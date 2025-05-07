@@ -1,9 +1,8 @@
 import streamlit as st
 from PIL import Image
-import cv2
 import numpy as np
-import os
-import onnxruntime as ort
+import cv2
+from ultralytics import YOLO
 
 # Configuration - French damage labels
 CLASS_NAMES = {
@@ -17,117 +16,88 @@ CLASS_NAMES = {
     7: "pare-brise endommagé"
 }
 
-# Load ONNX model
-MODEL_PATH = "yolostr/cardmg.onnx"
-if not os.path.exists(MODEL_PATH):
-    st.error(f"Modèle introuvable: {MODEL_PATH}")
-    st.stop()
-
+# Load PyTorch model
+MODEL_PATH = "cardmg.pt"  # Ensure this is in your root directory
 try:
-    session = ort.InferenceSession(MODEL_PATH)
-    input_name = session.get_inputs()[0].name
-    output_name = session.get_outputs()[0].name
+    model = YOLO(MODEL_PATH)
+    st.success("Modèle chargé avec succès!")
 except Exception as e:
     st.error(f"Erreur de chargement du modèle: {str(e)}")
     st.stop()
 
 st.title("Détection de Dommages sur Véhicule")
 
-def preprocess_image(image, target_size=640):
-    """Convert and normalize image for YOLO model"""
-    img_array = np.array(image)
-    if len(img_array.shape) == 2:  # Grayscale
-        img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
-    else:  # RGB
-        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+def draw_detections(image, results):
+    """Draw detection boxes on image"""
+    img_display = image.copy()
     
-    h, w = img_array.shape[:2]
-    scale = min(target_size / h, target_size / w)
-    nh, nw = int(h * scale), int(w * scale)
-    resized = cv2.resize(img_array, (nw, nh))
+    for result in results:
+        for box in result.boxes:
+            # Get box coordinates
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            
+            # Get class and confidence
+            cls_id = int(box.cls)
+            conf = float(box.conf)
+            class_name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
+            
+            # Draw rectangle
+            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # Draw label
+            label = f"{class_name} {conf:.2f}"
+            cv2.putText(img_display, label, (x1, y1 - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
     
-    padded = np.full((target_size, target_size, 3), 114, dtype=np.uint8)
-    padded[:nh, :nw] = resized
-    
-    img = padded.astype(np.float32) / 255.0
-    return np.transpose(img, (2, 0, 1))[np.newaxis, :], scale, (w, h)
+    return img_display
 
-def postprocess(outputs, scale, original_size, conf_thresh=0.25):
-    """Process YOLOv8 ONNX model output with empty sequence handling"""
-    try:
-        predictions = outputs[0][0]  # Shape: [84, 8400]
-        boxes = []
-        
-        # Check if we have valid predictions
-        if predictions.size == 0:
-            return boxes
-            
-        for pred in predictions.T:  # [8400, 84]
-            *xywh, conf, class_scores = np.split(pred, [4, 5, 5 + len(CLASS_NAMES)])
-            
-            # Handle empty class scores
-            if len(class_scores) == 0:
-                continue
-                
-            cls_id = np.argmax(class_scores)
-            total_conf = conf * class_scores[cls_id]
-            
-            if total_conf > conf_thresh:
-                x_center, y_center, w, h = xywh
-                x1 = int((x_center - w/2) * original_size[0] / scale)
-                y1 = int((y_center - h/2) * original_size[1] / scale)
-                x2 = int((x_center + w/2) * original_size[0] / scale)
-                y2 = int((y_center + h/2) * original_size[1] / scale)
-                
-                boxes.append({
-                    "coords": [max(0, x1), max(0, y1), 
-                              min(original_size[0], x2), 
-                              min(original_size[1], y2)],
-                    "class_id": int(cls_id),
-                    "confidence": float(total_conf),
-                    "class_name": CLASS_NAMES.get(int(cls_id), f"inconnu {cls_id}")
-                })
-        
-        return boxes
-    except Exception as e:
-        st.error(f"Erreur d'analyse: {str(e)}")
-        return []
-
-# File uploader
+# File uploader with confidence threshold
 img_file = st.file_uploader("Télécharger une image de véhicule", type=["jpg", "jpeg", "png"])
+conf_threshold = st.slider("Seuil de confiance", 0.01, 1.0, 0.25, 0.01)
 
 if img_file:
     try:
+        # Read image
         image = Image.open(img_file).convert("RGB")
-        original_w, original_h = image.size
+        img_array = np.array(image)
         
-        # Preprocess
-        input_tensor, scale, original_size = preprocess_image(image)
+        # Perform detection
+        results = model.predict(
+            source=img_array,
+            conf=conf_threshold,
+            imgsz=640,
+            device='cpu'  # Use 'cuda' if GPU available
+        )
         
-        # Inference
-        outputs = session.run([output_name], {input_name: input_tensor})
+        # Draw and display results
+        annotated_image = draw_detections(img_array, results)
+        st.image(annotated_image, caption="Résultats de détection", use_container_width=True)
         
-        # Postprocess
-        detections = postprocess(outputs, scale, (original_w, original_h))
-        
-        # Draw results
-        img_display = np.array(image)
-        for det in detections:
-            x1, y1, x2, y2 = det["coords"]
-            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            label = f"{det['class_name']} {det['confidence']:.2f}"
-            cv2.putText(img_display, label, (x1, y1 - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        
-        # Updated to use_container_width instead of use_column_width
-        st.image(img_display, caption="Résultats de détection", use_container_width=True)
+        # List detections
+        detections = []
+        for result in results:
+            for box in result.boxes:
+                cls_id = int(box.cls)
+                detections.append({
+                    "class_name": CLASS_NAMES.get(cls_id, f"inconnu {cls_id}"),
+                    "confidence": float(box.conf),
+                    "coords": box.xyxy[0].tolist()
+                })
         
         if detections:
             st.subheader("Dommages détectés:")
             for det in sorted(detections, key=lambda x: x["confidence"], reverse=True):
                 st.write(f"- {det['class_name']} (confiance: {det['confidence']:.2f})")
         else:
-            st.warning("Aucun dommage détecté - Essayez avec une image plus claire ou sous un angle différent")
+            st.warning("Aucun dommage détecté - Essayez avec:")
+            st.write("- Une image plus claire")
+            st.write("- Un angle différent")
+            st.write("- Un seuil de confiance plus bas")
+            
+        # Debug info
+        if st.checkbox("Afficher les informations de débogage"):
+            st.write("Résultats bruts:", results[0].boxes)
+            st.write("Nombre de détections:", len(detections))
             
     except Exception as e:
         st.error(f"Erreur de traitement: {str(e)}")
