@@ -6,14 +6,14 @@ from ultralytics import YOLO
 
 # Configuration - French damage labels
 CLASS_NAMES = {
-    0: "porte endommagée",
-    1: "fenêtre endommagée", 
-    2: "phare endommagé",
-    3: "rétroviseur endommagé",
+    0: "porte endommagee",
+    1: "fenetre endommagee", 
+    2: "phare endommage",
+    3: "retroviseur endommage",
     4: "bosse",
-    5: "capot endommagé",
-    6: "pare-chocs endommagé",
-    7: "pare-brise endommagé"
+    5: "capot endommage",
+    6: "pare-chocs endommage",
+    7: "pare-brise endommage"
 }
 
 # Load PyTorch model
