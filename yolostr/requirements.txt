@@ -5,3 +5,4 @@ opencv-python-headless>=4.5.4.60  # Use headless OpenCV
 numpy>=1.23.5
 Pillow>=10.0.0
 torch>=2.0.0
+onnxruntime
