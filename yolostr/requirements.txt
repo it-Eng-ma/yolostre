@@ -1,9 +1,7 @@
 streamlit>=1.22.0
-ultralytics==8.0.98
-opencv-python-headless==4.8.0.76  # Updated to match ultralytics requirements
+ultralytics==8.0.0
+opencv-python-headless>=4.5.4.60  # Updated to match ultralytics requirements
 numpy>=1.23.5  # More flexible range
 Pillow>=10.0.0
-#torch>=2.0.0  # More flexible version
-#onnxruntime>=1.15.1  # More flexible version
+torch>=1.8.0  # More flexible version
 
-numpy==1.26.0
