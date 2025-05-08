@@ -1,7 +1,7 @@
 streamlit>=1.22.0
 ultralytics==8.0.98
-opencv-python-headless==4.5.4.60  # Pinned version
-numpy==1.23.5  # Pinned for compatibility
+opencv-python-headless==4.8.0.76  # Updated to match ultralytics requirements
+numpy>=1.23.5,<2.0.0  # More flexible range
 Pillow>=10.0.0
-torch==2.0.0  # Pinned version
-onnxruntime==1.15.1  # Pinned version
+torch>=2.0.0  # More flexible version
+onnxruntime>=1.15.1  # More flexible version
