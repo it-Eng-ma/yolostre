@@ -6,4 +6,4 @@ Pillow>=10.0.0
 torch>=2.0.0  # More flexible version
 #onnxruntime>=1.15.1  # More flexible version
 
-numpy>=1.23.5
+numpy==1.26.0
