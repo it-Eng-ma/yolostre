@@ -1,7 +1,6 @@
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-import cv2
 from ultralytics import YOLO
 
 # Configuration - French damage labels
@@ -28,23 +27,30 @@ except Exception as e:
 st.title("Détection de Dommages sur Véhicule")
 
 def draw_detections(image, results):
-    """Draw detection boxes with ≥85% confidence"""
+    """Draw detection boxes with ≥85% confidence using PIL"""
     img_display = image.copy()
+    draw = ImageDraw.Draw(img_display)
+    
+    # Use a basic font (size=15 as a starting point)
+    try:
+        font = ImageFont.truetype("arial.ttf", 15)
+    except:
+        font = ImageFont.load_default()  # Fallback if font not found
+    
     detections = []
     
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf >= 0.85:  # Hardcoded 85% confidence threshold
+            if conf >= 0.85:
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 class_name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
                 
-                # Draw rectangle and label
-                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                # Draw rectangle and label (PIL uses RGB colors)
+                draw.rectangle([x1, y1, x2, y2], outline="green", width=2)
                 label = f"{class_name} {conf:.2f}"
-                cv2.putText(img_display, label, (x1, y1 - 10), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                draw.text((x1, y1 - 15), label, fill="red", font=font)
                 
                 detections.append({
                     "class_name": class_name,
@@ -59,11 +65,11 @@ img_file = st.file_uploader("Télécharger une image de véhicule", type=["jpg",
 
 if img_file:
     try:
-        # Read and process image
+        # Read image directly with PIL
         image = Image.open(img_file).convert("RGB")
         img_array = np.array(image)
         
-        # Perform detection (low initial threshold to catch all possibilities)
+        # Perform detection
         results = model.predict(
             source=img_array,
             conf=0.25,
@@ -71,15 +77,15 @@ if img_file:
             device='cpu'
         )
         
-        # Get filtered results (≥85% confidence only)
-        annotated_image, filtered_detections = draw_detections(img_array, results)
+        # Get filtered results
+        annotated_image, filtered_detections = draw_detections(image, results)  # Pass PIL Image directly
         st.image(annotated_image, caption="Dommages détectés (confiance ≥85%)", use_container_width=True)
         
-        # Display results
+        # Display results (unchanged)
         if filtered_detections:
             st.subheader("Dommages confirmés:")
             for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
-                st.write(f"- {det['class_name']} (certitude: {det['confidence']:.0%}")
+                st.write(f"- {det['class_name']} (certitude: {det['confidence']:.0%})")
         else:
             st.warning("Aucun dommage significatif détecté")
             st.info("Conseils pour une meilleure détection:")
@@ -87,7 +93,6 @@ if img_file:
             st.write("• Assurez un bon éclairage")
             st.write("• Capturez les détails de près")
             
-        # Optional debug info
         if st.checkbox("Afficher les détails techniques"):
             st.write("Total des détections potentielles:", len(results[0].boxes))
             st.write("Détections validées (≥85%):", len(filtered_detections))
