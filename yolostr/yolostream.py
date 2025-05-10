@@ -1,15 +1,16 @@
-
 import streamlit as st
 from PIL import Image
 import numpy as np
 import cv2
 from ultralytics import YOLO
-
 import json
 import streamlit.components.v1 as components
 import uuid
+import base64
+from io import BytesIO
 
 random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
+
 # Configuration - French damage labels
 CLASS_NAMES = {
     0: "porte endommagee",
@@ -99,24 +100,34 @@ if img_file:
         
         annotated_image, filtered_detections = draw_detections(img_array, results)
         st.image(annotated_image, caption="🛠️ Dommages détectés ", use_container_width=True)
-        # Convert annotated image to bytes for download
+        
+        # Convert annotated image to base64 to send it to Flutter
         annotated_pil = Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB))
-        from io import BytesIO
         img_bytes = BytesIO()
         annotated_pil.save(img_bytes, format='PNG')
         img_bytes.seek(0)
 
-# Download button
+        # Convert image to base64
+        img_base64 = base64.b64encode(img_bytes.read()).decode("utf-8")
 
-
-        st.download_button(
-        label="📥 Télécharger l'image annotée",
-        data=img_bytes,
-        file_name=random_filename,
-        mime="image/png"
-        )
-
-
+        # JavaScript to send the image to Flutter
+        components.html(f"""
+            <script>
+            setTimeout(function() {{
+                const base64Image = 'data:image/png;base64,{img_base64}';
+                
+                if (window.flutter_inappwebview) {{
+                    window.flutter_inappwebview.callHandler('sendAnnotatedImage', [base64Image])
+                        .then(function(response) {{
+                            console.log("✅ Annotated image sent to Flutter:", response);
+                        }});
+                }} else {{
+                    console.warn("⚠️ Flutter interface not found.");
+                }}
+            }}, 1000); // Delay to ensure Flutter is ready
+            </script>
+        """, height=0)
+        
         if filtered_detections:
             st.subheader("✅ Dommages confirmés:")
             for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
@@ -156,4 +167,3 @@ if img_file:
             
     except Exception as e:
         st.error(f"Erreur lors de l'analyse: {str(e)}")
-
