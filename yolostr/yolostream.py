@@ -138,8 +138,6 @@ if img_file:
 
 
 # Convert filtered detections to JSON string (only if detections exist)
-if filtered_detections:
-    st.markdown("### 📤 Envoyer les résultats à l'application mobile")
 
   # Height = 0 to hide it from UI
 
