@@ -55,7 +55,7 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf >= 0.25:
+            if conf >= 0.50:
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 class_name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
