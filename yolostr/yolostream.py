@@ -86,13 +86,16 @@ if img_source == "📁 Téléverser une image":
 elif img_source == "📷 Utiliser la caméra":
     img_camera = st.camera_input("Prenez une photo du véhicule")
     if img_camera is not None:
+        # Preprocessing the camera input
         image = Image.open(img_camera).convert("RGB")
+        image = image.resize((640, 640))  # Resize the image to fit YOLO model input size
 
 # 🔍 Process and detect if image is available
 if image is not None:
     try:
         img_array = np.array(image)
 
+        # You can also add additional checks or logging to ensure the image is valid.
         results = model.predict(
             source=img_array,
             conf=0.25,
@@ -140,14 +143,3 @@ if image is not None:
 
     except Exception as e:
         st.error(f"Erreur lors de l'analyse: {str(e)}")
-
-
-
-
-
-
-
-
-
-
-
