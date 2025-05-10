@@ -98,13 +98,13 @@ if image is not None:
         # You can also add additional checks or logging to ensure the image is valid.
         results = model.predict(
             source=img_array,
-            conf=0.9,#0.25
+            conf=0.1,#0.25
             imgsz=640,
-            device='cpu'
+            device='gpu'#cpu
         )
 
         annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés (confiance ≥25%)", use_container_width=True)
+        st.image(annotated_image, caption="🛠️ Dommages détectés ", use_container_width=True)
 
         if filtered_detections:
             st.subheader("✅ Dommages confirmés:")
