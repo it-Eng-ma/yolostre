@@ -100,7 +100,7 @@ if image is not None:
             source=img_array,
             conf=0.1,#0.25
             imgsz=640,
-            device='gpu'#cpu
+            device='cpu'#cpu
         )
 
         annotated_image, filtered_detections = draw_detections(img_array, results)
