@@ -7,6 +7,9 @@ from ultralytics import YOLO
 
 import json
 import streamlit.components.v1 as components
+import uuid
+
+random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 # Configuration - French damage labels
 CLASS_NAMES = {
     0: "porte endommagee",
@@ -96,7 +99,24 @@ if img_file:
         
         annotated_image, filtered_detections = draw_detections(img_array, results)
         st.image(annotated_image, caption="🛠️ Dommages détectés ", use_container_width=True)
-        
+        # Convert annotated image to bytes for download
+        annotated_pil = Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB))
+        from io import BytesIO
+        img_bytes = BytesIO()
+        annotated_pil.save(img_bytes, format='PNG')
+        img_bytes.seek(0)
+
+# Download button
+
+
+        st.download_button(
+        label="📥 Télécharger l'image annotée",
+        data=img_bytes,
+        file_name=random_filename,
+        mime="image/png"
+        )
+
+
         if filtered_detections:
             st.subheader("✅ Dommages confirmés:")
             for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
