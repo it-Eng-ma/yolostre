@@ -4,6 +4,8 @@ import numpy as np
 import cv2
 from ultralytics import YOLO
 
+import json
+import streamlit.components.v1 as components
 # Configuration - French damage labels
 CLASS_NAMES = {
     0: "porte endommagee",
@@ -98,6 +100,24 @@ if img_file:
             st.subheader("✅ Dommages confirmés:")
             for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
                 st.markdown(f"- **{det['class_name']}** (certitude: {det['confidence']:.0%})")
+
+            results_json = json.dumps(filtered_detections)
+
+            components.html(f"""
+            <script>
+            const results = {results_json};
+
+            // Call Flutter handler if available
+            if (window.flutter_inappwebview) {{
+                window.flutter_inappwebview.callHandler('sendResults', results)
+                    .then(function(response) {{
+                        console.log("Results sent to Flutter:", response);
+                    }});
+            }} else {{
+                console.warn("Flutter interface not found.");
+            }}
+            </script>
+            """, height=0)
         else:
             st.warning("🚫 Aucun dommage significatif détecté")
             st.info("🔍 Conseils pour une meilleure détection :")
@@ -115,9 +135,13 @@ if img_file:
         st.error(f"Erreur lors de l'analyse: {str(e)}")
 
 
-window.flutter_inappwebview.callHandler('sendResults', results);
 
 
+# Convert filtered detections to JSON string (only if detections exist)
+if filtered_detections:
+    st.markdown("### 📤 Envoyer les résultats à l'application mobile")
+
+  # Height = 0 to hide it from UI
 
 
 
