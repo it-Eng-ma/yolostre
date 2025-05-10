@@ -104,20 +104,22 @@ if img_file:
             results_json = json.dumps(filtered_detections)
 
             components.html(f"""
-            <script>
-            const results = {results_json};
+                <script>
+                setTimeout(function() {{
+                    const results = {results_json};
 
-            // Call Flutter handler if available
-            if (window.flutter_inappwebview) {{
-                window.flutter_inappwebview.callHandler('sendResults', results)
-                    .then(function(response) {{
-                        console.log("Results sent to Flutter:", response);
-                    }});
-            }} else {{
-                console.warn("Flutter interface not found.");
-            }}
-            </script>
+                    if (window.flutter_inappwebview) {{
+                        window.flutter_inappwebview.callHandler('sendResults', results)
+                            .then(function(response) {{
+                                console.log("✅ Results sent to Flutter:", response);
+                            }});
+                    }} else {{
+                        console.warn("⚠️ Flutter interface not found.");
+                    }}
+                }}, 1000); // Delay to ensure Flutter is ready
+                </script>
             """, height=0)
+
         else:
             st.warning("🚫 Aucun dommage significatif détecté")
             st.info("🔍 Conseils pour une meilleure détection :")
