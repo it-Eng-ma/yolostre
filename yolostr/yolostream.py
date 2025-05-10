@@ -114,7 +114,7 @@ if img_file:
     except Exception as e:
         st.error(f"Erreur lors de l'analyse: {str(e)}")
 
-// This line will send the results from the web page to Flutter
+
 window.flutter_inappwebview.callHandler('sendResults', results);
 
 
