@@ -117,7 +117,7 @@ if img_file:
                 const base64Image = 'data:image/png;base64,{img_base64}';
                 
                 if (window.flutter_inappwebview) {{
-                    window.flutter_inappwebview.callHandler('sendAnnotatedImage', [base64Image])
+                    window.flutter_inappwebview.callHandler('sendAnnotatedImage', base64Image)
                         .then(function(response) {{
                             console.log("✅ Annotated image sent to Flutter:", response);
                         }});
