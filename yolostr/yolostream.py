@@ -55,7 +55,7 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf >= 0.50:
+            if conf >= 0.25:
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 class_name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
@@ -98,13 +98,13 @@ if image is not None:
         # You can also add additional checks or logging to ensure the image is valid.
         results = model.predict(
             source=img_array,
-            conf=0.25,
+            conf=0.9,#0.25
             imgsz=640,
             device='cpu'
         )
 
         annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés (confiance ≥85%)", use_container_width=True)
+        st.image(annotated_image, caption="🛠️ Dommages détectés (confiance ≥25%)", use_container_width=True)
 
         if filtered_detections:
             st.subheader("✅ Dommages confirmés:")
