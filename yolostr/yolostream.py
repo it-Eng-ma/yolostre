@@ -141,6 +141,8 @@ if img_file:
     b64 = base64.b64encode(buf.getvalue()).decode()
 
     # Send both the Base64 string and the filename to Flutter
+
+    #st.write("Détections validées :", len(filtered_detections))
     components.html(f"""
       <script>
         setTimeout(function(){{
@@ -181,7 +183,10 @@ if img_file:
         
     if st.checkbox("🛠️ Afficher les détails techniques"):
         st.write("Total des détections potentielles:", len(results[0].boxes))
-        st.write("Détections validées (≥85%):", len(filtered_detections))
+        
+        
+        
+
 
 
 
