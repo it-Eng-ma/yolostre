@@ -11,7 +11,7 @@ import base64
 from io import BytesIO
 
 # Generate a random filename to send to Flutter
-random_filename = f"dommages_detectes_{uuid.uuid5().hex[:8]}.png"
+random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
 # French damage classes
 CLASS_NAMES = {
@@ -60,7 +60,11 @@ def draw_detections(image, results):
                 })
     return img_display, detections
 
-img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
+#img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
+st.markdown("### 📸 1) Prenez une photo de la partie endommagée")
+st.markdown("_Puis téléversez-la ci-dessous :_")
+
+img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 
 
 
