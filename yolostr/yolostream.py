@@ -81,12 +81,12 @@ if img_file:
     results = model.predict(
     source=arr,
     conf=0.2,              # 0.1Confidence threshold
-    iou=0.6,               # 0.3IoU threshold for NMS
+    iou=0.7,               # 0.3IoU threshold for NMS
     imgsz=( arr.shape[0], arr.shape[1]),      # Resize (height, width)
     device='cpu',
    
     augment=True,          # Test-time augmentation
-    max_det=80,            # allow up to 50 boxes
+    max_det=100,            # allow up to 50 boxes
     agnostic_nms=False
     )
 
