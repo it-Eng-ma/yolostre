@@ -172,6 +172,16 @@ if img_file:
         """, height=0)
     else:
         st.warning("🚫 Aucun dommage significatif détecté")
+            st.info("🔍 Conseils pour une meilleure détection :")
+            st.markdown("""
+                • 📸 Photographiez sous un angle direct  
+                • 💡 Assurez un bon éclairage  
+                • 🔍 Capturez les détails de près
+            """)
+        
+        if st.checkbox("🛠️ Afficher les détails techniques"):
+            st.write("Total des détections potentielles:", len(results[0].boxes))
+            st.write("Détections validées (≥85%):", len(filtered_detections))
 
 
 
