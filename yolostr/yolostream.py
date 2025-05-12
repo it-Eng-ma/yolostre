@@ -71,7 +71,7 @@ img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 if img_file:
     image = Image.open(img_file).convert("RGB")
     arr = np.array(image)
-    results = model.predict(source=arr, conf=0.45, imgsz=920, device='cpu')
+    results = model.predict(source=arr, conf=0.45, imgsz=500, device='cpu')#920
 
 
 
