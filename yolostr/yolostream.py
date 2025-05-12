@@ -60,20 +60,10 @@ def draw_detections(image, results):
                 })
     return img_display, detections
 
-#img_file = st.file_uploader("📁 Téléversez une image", type=["jpg","jpeg","png"])
+img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
 
-# Par ceci :
-img_file = st.camera_input(
-    "📸 Prenez une photo de la partie endommagée du véhicule",
-    help="Ou, si votre appareil ne dispose pas de caméra, téléversez une image ci-dessous."
-)
 
-# Et juste en dessous, on peut proposer en fallback un uploader :
-if not img_file:
-    img_file = st.file_uploader(
-        "📁 Téléversez une photo de la partie endommagée",
-        type=["jpg", "jpeg", "png"]
-    )
+
 if img_file:
     image = Image.open(img_file).convert("RGB")
     arr = np.array(image)
