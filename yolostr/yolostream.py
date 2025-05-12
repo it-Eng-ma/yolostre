@@ -1,3 +1,4 @@
+# ── app.py (your Streamlit backend) ──
 import streamlit as st
 from PIL import Image
 import numpy as np
@@ -9,10 +10,10 @@ import uuid
 import base64
 from io import BytesIO
 
-# Generate a random filename for our annotated image
+# Generate a random filename to send to Flutter
 random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
-# French labels
+# French damage classes
 CLASS_NAMES = {
     0: "porte endommagee",
     1: "fenetre endommagee", 
@@ -25,11 +26,17 @@ CLASS_NAMES = {
 }
 
 st.markdown("""
-    <style>/* mobile‐friendly CSS */</style>
+    <style> /* responsive CSS omitted for brevity */ </style>
 """, unsafe_allow_html=True)
 
 # Load your YOLO model
-model = YOLO("yolostr/cardmg.pt")
+MODEL_PATH = "yolostr/cardmg.pt"
+try:
+    model = YOLO(MODEL_PATH)
+    st.success("Modèle chargé avec succès!")
+except Exception as e:
+    st.error(f"Erreur de chargement du modèle: {e}")
+    st.stop()
 
 st.title("📷 Détection de Dommages sur Véhicule")
 
@@ -39,64 +46,63 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf < 0.5: continue
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            cls_id = int(box.cls)
-            name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
-            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(img_display, f"{name} {conf:.2f}", (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-            detections.append({
-                "class_name": name,
-                "confidence": conf,
-                "coords": [x1, y1, x2, y2]
-            })
+            if conf >= 0.5:
+                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                cls_id = int(box.cls)
+                name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
+                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0,255,0), 2)
+                cv2.putText(img_display, f"{name} {conf:.2f}",
+                            (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                detections.append({
+                    "class_name": name,
+                    "confidence": conf,
+                    "coords": [x1, y1, x2, y2]
+                })
     return img_display, detections
 
 img_file = st.file_uploader("📁 Téléversez une image", type=["jpg","jpeg","png"])
 if img_file:
     image = Image.open(img_file).convert("RGB")
-    img_arr = np.array(image)
-    results = model.predict(source=img_arr, conf=0.5, imgsz=640, device='cpu')
-    annotated, dets = draw_detections(img_arr, results)
+    arr = np.array(image)
+    results = model.predict(source=arr, conf=0.5, imgsz=640, device='cpu')
+    annotated, dets = draw_detections(arr, results)
     st.image(annotated, caption="🛠️ Dommages détectés", use_container_width=True)
 
-    # Encode annotated image to base64
-    pil_annot = Image.fromarray(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB))
+    # Convert annotated image to Base64
     buf = BytesIO()
-    pil_annot.save(buf, format='PNG')
+    Image.fromarray(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)) \
+         .save(buf, format='PNG')
     b64 = base64.b64encode(buf.getvalue()).decode()
 
-    # Send both the base64 data AND the filename to Flutter
+    # Send both the Base64 string and the filename to Flutter
     components.html(f"""
       <script>
-        setTimeout(() => {{
-          const data = 'data:image/png;base64,{b64}';
-          const filename = '{random_filename}';
+        setTimeout(function(){{
+          const payload = {{
+            base64: "data:image/png;base64,{b64}",
+            filename: "{random_filename}"
+          }};
           if (window.flutter_inappwebview) {{
             window.flutter_inappwebview
-              .callHandler('sendAnnotatedImage', data, filename)
-              .then(res => console.log('✅ sent image + name:', res));
-          }} else console.warn('⚠️ Flutter handler missing');
+              .callHandler('sendAnnotatedImage', payload)
+              .then(r => console.log("✅ Annotated sent", r));
+          }} else {{
+            console.warn("⚠️ Flutter interface missing");
+          }}
         }}, 500);
       </script>
     """, height=0)
 
-    # Send the detection results too
+    # Send the detection JSON list
     if dets:
-      st.subheader("✅ Dommages confirmés:")
-      for d in sorted(dets, key=lambda x: x["confidence"], reverse=True):
-          st.markdown(f"- **{d['class_name']}** ({d['confidence']:.0%})")
-      comp_js = json.dumps(dets)
-      components.html(f"""
-        <script>
-          setTimeout(() => {{
-            const results = {comp_js};
-            window.flutter_inappwebview
-              .callHandler('sendResults', results)
-              .then(res => console.log('✅ sent results:', res));
-          }}, 500);
-        </script>
-      """, height=0)
+        js = json.dumps(dets)
+        components.html(f"""
+          <script>
+            setTimeout(function(){{
+              window.flutter_inappwebview
+                .callHandler('sendResults', {js});
+            }}, 500);
+          </script>
+        """, height=0)
     else:
-      st.warning("🚫 Aucun dommage significatif détecté")
+        st.warning("🚫 Aucun dommage significatif détecté")
