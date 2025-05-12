@@ -39,7 +39,7 @@ except Exception as e:
     st.stop()
 
 #st.title("📷 Détection de Dommages sur Véhicule")
-st.markdown("###### Détection de Dommages:")
+st.markdown("##### Détection de Dommages:")
 
 def draw_detections(image, results):
     img_display = image.copy()
@@ -62,8 +62,8 @@ def draw_detections(image, results):
     return img_display, detections
 
 #img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
-st.markdown("### 📸 1) Prenez une photo de la partie endommagée")
-st.markdown("_Puis téléversez-la ci-dessous :_")
+st.markdown("###  1) Prenez une photo📸 de la partie endommagée 🚗")
+st.markdown("_2) Puis téléversez-la ci-dessous :_")
 
 img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 
