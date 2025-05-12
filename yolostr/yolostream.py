@@ -103,86 +103,81 @@ st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
 img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 
 
-
 if img_file:
-    image = Image.open(img_file).convert("RGB")
-    #image = image.resize((448, 640))  # (width, height)
-    arr = np.array(image)
-    #results = model.predict(source=arr, conf=0.25, imgsz=(448, 640), device='cpu')  # or imgsz=(317,159)
-    results = model.predict(
-    source=arr,
-    conf=0.2,              # 0.1Confidence threshold
-    iou=0.7,               # 0.3IoU threshold for NMS
-    imgsz=( arr.shape[0], arr.shape[1]),      # Resize (height, width)
-    device='cpu',
-   
-    augment=True,          # Test-time augmentation
-    max_det=100,            # allow up to 50 boxes
-    agnostic_nms=False
-    )
+    try:
+        image = Image.open(img_file).convert("RGB")
+        img_array = np.array(image)
 
+        results = model.predict(
+            source=img_array,
+            conf=0.2,                    # Confidence threshold
+            iou=0.7,                     # IoU threshold for NMS
+            imgsz=(img_array.shape[0], img_array.shape[1]),  # Use original image size
+            device='cpu',
+            augment=True,               # Enable test-time augmentation
+            max_det=100,
+            agnostic_nms=False
+        )
 
+        annotated_image, filtered_detections = draw_detections(img_array, results)
+        st.image(annotated_image, caption="🛠️ Dommages détectés", use_container_width=True)
 
+        if filtered_detections:
+            st.subheader("✅ Dommages confirmés:")
+            for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
+                st.markdown(f"- **{det['class_name']}** (certitude: {det['confidence']:.0%})")
 
+            # Convert annotated image to Base64 for Flutter
+            buf = BytesIO()
+            Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
+            b64 = base64.b64encode(buf.getvalue()).decode()
 
-    
-    #results = model.predict(source=arr, conf=0.45, imgsz=500, device='cpu')#920
+            # Send image to Flutter
+            components.html(f"""
+                <script>
+                setTimeout(function() {{
+                    const payload = {{
+                        base64: "data:image/png;base64,{b64}",
+                        filename: "{random_filename}"
+                    }};
+                    if (window.flutter_inappwebview) {{
+                        window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
+                            .then(res => console.log("✅ Annotated image sent", res));
+                    }} else {{
+                        console.warn("⚠️ Flutter interface not found.");
+                    }}
+                }}, 500);
+                </script>
+            """, height=0)
 
+            # Send detections to Flutter
+            results_json = json.dumps(filtered_detections)
+            components.html(f"""
+                <script>
+                setTimeout(function() {{
+                    if (window.flutter_inappwebview) {{
+                        window.flutter_inappwebview.callHandler('sendResults', {results_json});
+                    }}
+                }}, 500);
+                </script>
+            """, height=0)
 
-
-
-    annotated, dets = draw_detections(arr, results)
-    st.image(annotated, caption="🛠️ Dommages détectés", use_container_width=True)
-
-    # Convert annotated image to Base64
-    buf = BytesIO()
-    Image.fromarray(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)) \
-         .save(buf, format='PNG')
-    b64 = base64.b64encode(buf.getvalue()).decode()
-
-    # Send both the Base64 string and the filename to Flutter
-
-    #st.write("Détections validées :", len(filtered_detections))
-    components.html(f"""
-      <script>
-        setTimeout(function(){{
-          const payload = {{
-            base64: "data:image/png;base64,{b64}",
-            filename: "{random_filename}"
-          }};
-          if (window.flutter_inappwebview) {{
-            window.flutter_inappwebview
-              .callHandler('sendAnnotatedImage', payload)
-              .then(r => console.log("✅ Annotated sent", r));
-          }} else {{
-            console.warn("⚠️ Flutter interface missing");
-          }}
-        }}, 500);
-      </script>
-    """, height=0)
-
-    # Send the detection JSON list
-    if dets:
-        js = json.dumps(dets)
-        components.html(f"""
-          <script>
-            setTimeout(function(){{
-              window.flutter_inappwebview
-                .callHandler('sendResults', {js});
-            }}, 500);
-          </script>
-        """, height=0)
-    else:
-        st.warning("🚫 Aucun dommage significatif détecté")
-        st.info("🔍 Conseils pour une meilleure détection :")
-        st.markdown("""
+        else:
+            st.warning("🚫 Aucun dommage significatif détecté")
+            st.info("🔍 Conseils pour une meilleure détection :")
+            st.markdown("""
                 • 📸 Photographiez sous un angle direct  
                 • 💡 Assurez un bon éclairage  
                 • 🔍 Capturez les détails de près
             """)
-        
-    if st.checkbox("🛠️ Afficher les détails techniques"):
-        st.write("Total des détections potentielles:", len(results[0].boxes))
+
+        if st.checkbox("🛠️ Afficher les détails techniques"):
+            st.write("Total des détections potentielles:", len(results[0].boxes))
+            st.write("Détections validées (≥20% confiance):", len(filtered_detections))
+
+    except Exception as e:
+        st.error(f"❌ Erreur lors de l’analyse de l’image : {str(e)}")
+
         
         
         
