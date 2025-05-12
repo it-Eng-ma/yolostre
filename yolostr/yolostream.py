@@ -71,7 +71,7 @@ img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 if img_file:
     image = Image.open(img_file).convert("RGB")
     arr = np.array(image)
-    results = model.predict(source=arr, conf=0.5, imgsz=640, device='cpu')
+    results = model.predict(source=arr, conf=0.35, imgsz=640, device='cpu')
     annotated, dets = draw_detections(arr, results)
     st.image(annotated, caption="🛠️ Dommages détectés", use_container_width=True)
 
