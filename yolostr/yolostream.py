@@ -65,7 +65,7 @@ def draw_detections(image, results):
 st.markdown("###  1) Prenez une photo📸 de la partie endommagée 🚗")
 st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
 
-img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
+img_file = st.file_uploader("", type=["image/jpg", "image/jpeg", "image/png"])
 
 
 
