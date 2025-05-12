@@ -73,14 +73,14 @@ if img_file:
     arr = np.array(image)
    # results = model.predict(source=arr, conf=0.5, imgsz=1280, device='cpu')
 
-  results = model.predict(
+    results = model.predict(
     source=arr,
     conf=0.5,             # Lower threshold to detect smaller damages
     iou=0.5,               # Control NMS – keep it moderate
     imgsz=(448, 640),      # Match your model input
     device='cpu',          # CPU inference
     max_det=20             # Optional: increase max detections per image
-)
+    )
 
 
     annotated, dets = draw_detections(arr, results)
