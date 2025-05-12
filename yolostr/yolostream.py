@@ -46,10 +46,10 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            class_threshold = 0.1
+            #class_threshold = 0.1
            # conf_class_score = float(box.cls_conf)  # or whatever variable stores class confidence
 
-            if conf >= 0.1 and 0.1 >= class_threshold:
+            if conf >= 0.1:
             #if conf >= 0.9:#0.5
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
@@ -79,10 +79,16 @@ if img_file:
     #results = model.predict(source=arr, conf=0.25, imgsz=(448, 640), device='cpu')  # or imgsz=(317,159)
     results = model.predict(
     source=arr,
-    conf=0.1,              # Confidence threshold
-    iou=0.3,               # IoU threshold for NMS
+    conf=0.3,              # 0.1Confidence threshold
+    iou=0.5,               # 0.3IoU threshold for NMS
     imgsz=( arr.shape[0], arr.shape[1]),      # Resize (height, width)
     device='cpu'
+          
+                  # moderate NMS overlap
+   
+    augment=True,          # Test-time augmentation
+    max_det=50,            # allow up to 50 boxes
+    agnostic_nms=False
     )
 
 
