@@ -33,26 +33,25 @@ st.markdown("""
     <style>
         /* Hide Streamlit UI elements */
         #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
+        footer {visibility: hidden; height: 0px;}
         header {visibility: hidden;}
 
-        /* Force app to use full screen height */
+        /* Force full screen layout */
         .block-container {
             padding-top: 0rem;
             padding-bottom: 0rem;
         }
 
-        html, body, .main {
-            height: 100%;
+        html, body, .main, .stApp {
+            height: 100vh;
             margin: 0;
             padding: 0;
             overflow: hidden;
+            background-color: white;
         }
 
-        /* Full height for mobile too */
-        .stApp {
-            height: 100vh;
-        }
+        /* Extra: prevent spacing from default Streamlit padding */
+        section.main > div {padding-bottom: 0rem;}
     </style>
 """, unsafe_allow_html=True)
 
