@@ -71,16 +71,9 @@ img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 if img_file:
     image = Image.open(img_file).convert("RGB")
     arr = np.array(image)
-   # results = model.predict(source=arr, conf=0.5, imgsz=1280, device='cpu')
+    results = model.predict(source=arr, conf=0.5, imgsz=920, device='cpu')
 
-    results = model.predict(
-    source=arr,
-    conf=0.35,             # Lower threshold to detect smaller damages
-    #iou=0.5,               # Control NMS – keep it moderate
-    imgsz=(960, 720),      # Match your model input
-    device='cpu',          # CPU inference
-   # max_det=20             # Optional: increase max detections per image
-    )
+
 
 
     annotated, dets = draw_detections(arr, results)
