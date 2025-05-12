@@ -28,18 +28,34 @@ CLASS_NAMES = {
  #   <style> /* responsive CSS omitted for brevity */ </style>
 #""", unsafe_allow_html=True)
 
+
 st.markdown("""
     <style>
-        /* Hide Streamlit hamburger menu, footer, and top header */
+        /* Hide Streamlit UI elements */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
-        
-        /* Additional footer hide for recent Streamlit versions */
-        .st-emotion-cache-18ni7ap.ezrtsby0 {visibility: hidden;}
-        .st-emotion-cache-1v0mbdj.e115fcil2 {visibility: hidden;}
+
+        /* Force app to use full screen height */
+        .block-container {
+            padding-top: 0rem;
+            padding-bottom: 0rem;
+        }
+
+        html, body, .main {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        /* Full height for mobile too */
+        .stApp {
+            height: 100vh;
+        }
     </style>
 """, unsafe_allow_html=True)
+
 
 
 
