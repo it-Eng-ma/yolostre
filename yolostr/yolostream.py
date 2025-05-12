@@ -79,7 +79,7 @@ if img_file:
     results = model.predict(
     source=arr,
     conf=0.1,              # Confidence threshold
-    iou=0.3,               # IoU threshold for NMS
+   # iou=0.3,               # IoU threshold for NMS
     imgsz=( arr.shape[0], arr.shape[1]),      # Resize (height, width)
     device='cpu'
     )
