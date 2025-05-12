@@ -47,8 +47,9 @@ def draw_detections(image, results):
         for box in result.boxes:
             conf = float(box.conf)
             class_threshold = 0.1
+            conf_class_score = float(box.cls_conf)  # or whatever variable stores class confidence
 
-             if conf >= 0.1 and conf_class_score >= class_threshold:
+            if conf >= 0.1 and conf_class_score >= class_threshold:
             #if conf >= 0.9:#0.5
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
