@@ -97,6 +97,12 @@ def draw_detections(image, results):
 
 
 #img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
+
+       # if st.checkbox("🛠️ Afficher les détails techniques"):
+            #st.write("Total des détections potentielles:", len(results[0].boxes))
+           # st.write("Détections validées (≥20% confiance):", len(filtered_detections))
+
+
 st.markdown("###  1) Prenez une photo📸 de la partie endommagée 🚗")
 st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
 
@@ -171,9 +177,7 @@ if img_file:
                 • 🔍 Capturez les détails de près
             """)
 
-        if st.checkbox("🛠️ Afficher les détails techniques"):
-            st.write("Total des détections potentielles:", len(results[0].boxes))
-            st.write("Détections validées (≥20% confiance):", len(filtered_detections))
+
 
     except Exception as e:
         st.error(f"❌ Erreur lors de l’analyse de l’image : {str(e)}")
