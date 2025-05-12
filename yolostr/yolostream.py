@@ -77,7 +77,7 @@ if img_file:
     source=arr,
     conf=0.35,             # Lower threshold to detect smaller damages
     #iou=0.5,               # Control NMS – keep it moderate
-    imgsz=(448, 640),      # Match your model input
+    imgsz=(960, 720),      # Match your model input
     device='cpu',          # CPU inference
    # max_det=20             # Optional: increase max detections per image
     )
