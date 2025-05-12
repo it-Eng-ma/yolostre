@@ -27,29 +27,17 @@ CLASS_NAMES = {
 #st.markdown("""
  #   <style> /* responsive CSS omitted for brevity */ </style>
 #""", unsafe_allow_html=True)
+
 st.markdown("""
     <style>
-        /* Hide the Streamlit top bar (header) */
-        .css-1d391kg { 
-            display: none;
-        }
-        
-        /* Hide the Streamlit footer */
-        .css-1p3y3i8 { 
-            display: none;
-        }
-
-        /* Optional: Hide the hamburger menu on mobile */
-        .css-1l1cdzz {
-            display: none;
-        }
-
-        /* Optional: Adjust padding for the main app */
-        .stApp {
-            padding-top: 0px;
-        }
+        /* Hide the Streamlit top bar, footer and menu */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
+
+
 # Load your YOLO model
 MODEL_PATH = "yolostr/cardmg.pt"
 try:
