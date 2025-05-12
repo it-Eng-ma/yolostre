@@ -46,7 +46,7 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf >= 0.45:#0.5
+            if conf >= 0.90:#0.5
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
@@ -72,7 +72,7 @@ if img_file:
     image = Image.open(img_file).convert("RGB")
     image = image.resize((448, 640))  # (width, height)
     arr = np.array(image)
-    results = model.predict(source=arr, conf=0.45, imgsz=(448, 640), device='cpu')  # or imgsz=(317,159)
+    results = model.predict(source=arr, conf=0.90, imgsz=(448, 640), device='cpu')  # or imgsz=(317,159)
 
     #results = model.predict(source=arr, conf=0.45, imgsz=500, device='cpu')#920
 
