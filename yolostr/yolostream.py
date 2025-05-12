@@ -40,28 +40,28 @@ except Exception as e:
 #st.title("📷 Détection de Dommages sur Véhicule")
 st.markdown("##### Détection de Dommages:")
 
-def draw_detections(image, results, conf_threshold=0.3):
+def draw_detections(image, results):
     img_display = image.copy()
-    detections   = []
+    detections = []
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf < conf_threshold:
-                continue
+            #class_threshold = 0.1
+           # conf_class_score = float(box.cls_conf)  # or whatever variable stores class confidence
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            cls_id = int(box.cls)
-            name   = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
-
-            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0,255,0), 2)
-            cv2.putText(img_display, f"{name} {conf:.2f}",
-                        (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
-
-            detections.append({
-                "class_name": name,
-                "confidence": conf,
-                "coords": [x1, y1, x2, y2]
-            })
+            if conf >= 0.1:
+            #if conf >= 0.9:#0.5
+                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                cls_id = int(box.cls)
+                name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
+                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0,255,0), 2)
+                cv2.putText(img_display, f"{name} {conf:.2f}",
+                            (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                detections.append({
+                    "class_name": name,
+                    "confidence": conf,
+                    "coords": [x1, y1, x2, y2]
+                })
     return img_display, detections
 
 
