@@ -48,7 +48,7 @@ def draw_detections(image, results):
             conf = float(box.conf)
             #class_threshold = 0.1
 
-            if conf >= 0.25:
+            if conf >= 0.2:
             #if conf >= 0.9:#0.5
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
