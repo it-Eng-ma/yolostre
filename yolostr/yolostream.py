@@ -39,7 +39,7 @@ except Exception as e:
     st.stop()
 
 #st.title("📷 Détection de Dommages sur Véhicule")
-st.markdown("### Détection de Dommages sur Véhicule")
+st.markdown("## Détection de Dommages :")
 
 def draw_detections(image, results):
     img_display = image.copy()
