@@ -9,9 +9,10 @@ import uuid
 import base64
 from io import BytesIO
 
+# Generate a random filename for our annotated image
 random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
-# Configuration - French damage labels
+# French labels
 CLASS_NAMES = {
     0: "porte endommagee",
     1: "fenetre endommagee", 
@@ -23,147 +24,79 @@ CLASS_NAMES = {
     7: "pare-brise endommage"
 }
 
-# Custom CSS for better mobile experience
 st.markdown("""
-    <style>
-        /* Better padding and font scaling for small screens */
-        html, body, [class*="css"]  {
-            font-size: 16px;
-        }
-
-        /* Ensure uploader and image are fully responsive */
-        .element-container {
-            width: 100% !important;
-        }
-
-        img {
-            max-width: 100%;
-            height: auto;
-        }
-
-        /* Mobile-friendly buttons and checkboxes */
-        button, .stButton>button, .stCheckbox>label {
-            font-size: 1.1em;
-        }
-    </style>
+    <style>/* mobile‐friendly CSS */</style>
 """, unsafe_allow_html=True)
 
-# Load model
-MODEL_PATH = "yolostr/cardmg.pt"
-try:
-    model = YOLO(MODEL_PATH)
-    st.success("Modèle chargé avec succès!")
-except Exception as e:
-    st.error(f"Erreur de chargement du modèle: {str(e)}")
-    st.stop()
+# Load your YOLO model
+model = YOLO("yolostr/cardmg.pt")
 
 st.title("📷 Détection de Dommages sur Véhicule")
 
 def draw_detections(image, results):
     img_display = image.copy()
     detections = []
-    
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf >= 0.5:
-                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                cls_id = int(box.cls)
-                class_name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
-                
-                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                label = f"{class_name} {conf:.2f}"
-                cv2.putText(img_display, label, (x1, y1 - 10), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-                
-                detections.append({
-                    "class_name": class_name,
-                    "confidence": conf,
-                    "coords": [x1, y1, x2, y2]
-                })
-    
+            if conf < 0.5: continue
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            cls_id = int(box.cls)
+            name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
+            cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(img_display, f"{name} {conf:.2f}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            detections.append({
+                "class_name": name,
+                "confidence": conf,
+                "coords": [x1, y1, x2, y2]
+            })
     return img_display, detections
 
-img_file = st.file_uploader("📁 Téléversez une image du véhicule", type=["jpg", "jpeg", "png"])
-
+img_file = st.file_uploader("📁 Téléversez une image", type=["jpg","jpeg","png"])
 if img_file:
-    try:
-        image = Image.open(img_file).convert("RGB")
-        img_array = np.array(image)
-        
-        results = model.predict(
-            source=img_array,
-            conf=0.5,
-            imgsz=640,
-            device='cpu'
-        )
-        
-        annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés ", use_container_width=True)
-        
-        # Convert annotated image to base64 to send it to Flutter
-        annotated_pil = Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB))
-        img_bytes = BytesIO()
-        annotated_pil.save(img_bytes, format='PNG')
-        img_bytes.seek(0)
+    image = Image.open(img_file).convert("RGB")
+    img_arr = np.array(image)
+    results = model.predict(source=img_arr, conf=0.5, imgsz=640, device='cpu')
+    annotated, dets = draw_detections(img_arr, results)
+    st.image(annotated, caption="🛠️ Dommages détectés", use_container_width=True)
 
-        # Convert image to base64
-        img_base64 = base64.b64encode(img_bytes.read()).decode("utf-8")
+    # Encode annotated image to base64
+    pil_annot = Image.fromarray(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB))
+    buf = BytesIO()
+    pil_annot.save(buf, format='PNG')
+    b64 = base64.b64encode(buf.getvalue()).decode()
 
-        # JavaScript to send the image to Flutter
-        components.html(f"""
-            <script>
-            setTimeout(function() {{
-                const base64Image = 'data:image/png;base64,{img_base64}';
-                
-                if (window.flutter_inappwebview) {{
-                    window.flutter_inappwebview.callHandler('sendAnnotatedImage', base64Image)
-                        .then(function(response) {{
-                            console.log("✅ Annotated image sent to Flutter:", response);
-                        }});
-                }} else {{
-                    console.warn("⚠️ Flutter interface not found.");
-                }}
-            }}, 1000); // Delay to ensure Flutter is ready
-            </script>
-        """, height=0)
-        
-        if filtered_detections:
-            st.subheader("✅ Dommages confirmés:")
-            for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
-                st.markdown(f"- **{det['class_name']}** (certitude: {det['confidence']:.0%})")
+    # Send both the base64 data AND the filename to Flutter
+    components.html(f"""
+      <script>
+        setTimeout(() => {{
+          const data = 'data:image/png;base64,{b64}';
+          const filename = '{random_filename}';
+          if (window.flutter_inappwebview) {{
+            window.flutter_inappwebview
+              .callHandler('sendAnnotatedImage', data, filename)
+              .then(res => console.log('✅ sent image + name:', res));
+          }} else console.warn('⚠️ Flutter handler missing');
+        }}, 500);
+      </script>
+    """, height=0)
 
-            results_json = json.dumps(filtered_detections)
-
-            components.html(f"""
-                <script>
-                setTimeout(function() {{
-                    const results = {results_json};
-
-                    if (window.flutter_inappwebview) {{
-                        window.flutter_inappwebview.callHandler('sendResults', results)
-                            .then(function(response) {{
-                                console.log("✅ Results sent to Flutter:", response);
-                            }});
-                    }} else {{
-                        console.warn("⚠️ Flutter interface not found.");
-                    }}
-                }}, 1000); // Delay to ensure Flutter is ready
-                </script>
-            """, height=0)
-
-        else:
-            st.warning("🚫 Aucun dommage significatif détecté")
-            st.info("🔍 Conseils pour une meilleure détection :")
-            st.markdown("""
-                • 📸 Photographiez sous un angle direct  
-                • 💡 Assurez un bon éclairage  
-                • 🔍 Capturez les détails de près
-            """)
-        
-        if st.checkbox("🛠️ Afficher les détails techniques"):
-            st.write("Total des détections potentielles:", len(results[0].boxes))
-            st.write("Détections validées :", len(filtered_detections))
-            
-    except Exception as e:
-        st.error(f"Erreur lors de l'analyse: {str(e)}")
+    # Send the detection results too
+    if dets:
+      st.subheader("✅ Dommages confirmés:")
+      for d in sorted(dets, key=lambda x: x["confidence"], reverse=True):
+          st.markdown(f"- **{d['class_name']}** ({d['confidence']:.0%})")
+      comp_js = json.dumps(dets)
+      components.html(f"""
+        <script>
+          setTimeout(() => {{
+            const results = {comp_js};
+            window.flutter_inappwebview
+              .callHandler('sendResults', results)
+              .then(res => console.log('✅ sent results:', res));
+          }}, 500);
+        </script>
+      """, height=0)
+    else:
+      st.warning("🚫 Aucun dommage significatif détecté")
