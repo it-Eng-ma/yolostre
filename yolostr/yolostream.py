@@ -46,7 +46,10 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf >= 0.25:#0.5
+            class_threshold = 0.1
+
+            if conf >= 0.9 and conf_class_score >= class_threshold:
+            #if conf >= 0.9:#0.5
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
@@ -77,7 +80,7 @@ if img_file:
     source=arr,
     conf=0.9,              # Confidence threshold
     iou=0.3,               # IoU threshold for NMS
-    imgsz=( 640,448),      # Resize (height, width)
+    imgsz=( (448, 640)),      # Resize (height, width)
     device='cpu'
     )
 
