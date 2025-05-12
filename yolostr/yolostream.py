@@ -30,12 +30,17 @@ CLASS_NAMES = {
 
 st.markdown("""
     <style>
-        /* Hide the Streamlit top bar, footer and menu */
+        /* Hide Streamlit hamburger menu, footer, and top header */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
+        
+        /* Additional footer hide for recent Streamlit versions */
+        .st-emotion-cache-18ni7ap.ezrtsby0 {visibility: hidden;}
+        .st-emotion-cache-1v0mbdj.e115fcil2 {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
+
 
 
 # Load your YOLO model
