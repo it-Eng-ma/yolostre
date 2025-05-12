@@ -46,7 +46,7 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            if conf >= 0.5:#0.5
+            if conf >= 0.45:#0.5
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
@@ -62,16 +62,16 @@ def draw_detections(image, results):
 
 #img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
 st.markdown("###  1) Prenez une photo📸 de la partie endommagée 🚗")
-st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
+#st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
 
-img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
+img_file = st.file_uploader("#### _2) Puis téléversez-la ci-dessous :_", type=["jpg", "jpeg", "png"])
 
 
 
 if img_file:
     image = Image.open(img_file).convert("RGB")
     arr = np.array(image)
-    results = model.predict(source=arr, conf=0.5, imgsz=920, device='cpu')
+    results = model.predict(source=arr, conf=0.45, imgsz=920, device='cpu')
 
 
 
