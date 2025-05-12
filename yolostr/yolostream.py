@@ -73,14 +73,14 @@ img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 
 if img_file:
     image = Image.open(img_file).convert("RGB")
-    image = image.resize((448, 640))  # (width, height)
+    #image = image.resize((448, 640))  # (width, height)
     arr = np.array(image)
     #results = model.predict(source=arr, conf=0.25, imgsz=(448, 640), device='cpu')  # or imgsz=(317,159)
     results = model.predict(
     source=arr,
     conf=0.25,              # Confidence threshold
     iou=0.3,               # IoU threshold for NMS
-    imgsz=( (448, 640)),      # Resize (height, width)
+    imgsz=( arr.shape[0], arr.shape[1]),      # Resize (height, width)
     device='cpu'
     )
 
