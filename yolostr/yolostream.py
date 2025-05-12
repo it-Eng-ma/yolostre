@@ -11,7 +11,7 @@ import base64
 from io import BytesIO
 
 # Generate a random filename to send to Flutter
-random_filename = f"dommages_detectes_{uuid.uuid2().hex[:8]}.png"
+random_filename = f"dommages_detectes_{uuid.uuid5().hex[:8]}.png"
 
 # French damage classes
 CLASS_NAMES = {
