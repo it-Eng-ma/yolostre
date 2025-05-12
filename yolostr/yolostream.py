@@ -77,7 +77,7 @@ if img_file:
     source=arr,
     conf=0.9,              # Confidence threshold
     iou=0.3,               # IoU threshold for NMS
-    imgsz=(448, 640),      # Resize (height, width)
+    imgsz=( 640,448),      # Resize (height, width)
     device='cpu'
     )
 
