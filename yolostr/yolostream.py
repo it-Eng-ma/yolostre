@@ -82,9 +82,7 @@ if img_file:
     conf=0.3,              # 0.1Confidence threshold
     iou=0.5,               # 0.3IoU threshold for NMS
     imgsz=( arr.shape[0], arr.shape[1]),      # Resize (height, width)
-    device='cpu'
-          
-                  # moderate NMS overlap
+    device='cpu',
    
     augment=True,          # Test-time augmentation
     max_det=50,            # allow up to 50 boxes
