@@ -125,45 +125,44 @@ if img_file:
             agnostic_nms=False
         )
 
-        annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés")#, use_container_width=True
+annotated_image, filtered_detections = draw_detections(img_array, results)
+st.image(annotated_image, caption="🛠️ Dommages détectés")  # , use_container_width=True
 
+# Convert annotated image to Base64 for Flutter
+buf = BytesIO()
+Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
+b64 = base64.b64encode(buf.getvalue()).decode()
 
-            # Convert annotated image to Base64 for Flutter
-            buf = BytesIO()
-            Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
-            b64 = base64.b64encode(buf.getvalue()).decode()
+# Send image to Flutter
+components.html(f"""
+    <script>
+    setTimeout(function() {{
+        const payload = {{
+            base64: "data:image/png;base64,{b64}",
+            filename: "{random_filename}"
+        }};
+        if (window.flutter_inappwebview) {{
+            window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
+                .then(res => console.log("✅ Annotated image sent", res));
+        }} else {{
+            console.warn("⚠️ Flutter interface not found.");
+        }}
+    }}, 500);
+    </script>
+""", height=0)
 
-            # Send image to Flutter
-            components.html(f"""
-                <script>
-                setTimeout(function() {{
-                    const payload = {{
-                        base64: "data:image/png;base64,{b64}",
-                        filename: "{random_filename}"
-                    }};
-                    if (window.flutter_inappwebview) {{
-                        window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
-                            .then(res => console.log("✅ Annotated image sent", res));
-                    }} else {{
-                        console.warn("⚠️ Flutter interface not found.");
-                    }}
-                }}, 500);
-                </script>
-            """, height=0)
+# Send detections to Flutter
+results_json = json.dumps(filtered_detections)
+components.html(f"""
+    <script>
+    setTimeout(function() {{
+        if (window.flutter_inappwebview) {{
+            window.flutter_inappwebview.callHandler('sendResults', {results_json});
+        }}
+    }}, 500);
+    </script>
+""", height=0)
 
-            # Send detections to Flutter
-            results_json = json.dumps(filtered_detections)
-            components.html(f"""
-                <script>
-                setTimeout(function() {{
-                    if (window.flutter_inappwebview) {{
-                        window.flutter_inappwebview.callHandler('sendResults', {results_json});
-                    }}
-                }}, 500);
-                </script>
-            """, height=0)
-            #was under st image
         if filtered_detections:
             st.subheader("✅ Dommages confirmés:")
             for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
