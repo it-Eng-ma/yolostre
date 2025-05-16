@@ -128,10 +128,6 @@ if img_file:
         annotated_image, filtered_detections = draw_detections(img_array, results)
         st.image(annotated_image, caption="🛠️ Dommages détectés")#, use_container_width=True
 
-        if filtered_detections:
-            st.subheader("✅ Dommages confirmés:")
-            for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
-                st.markdown(f"- **{det['class_name']}** (certitude: {det['confidence']:.0%})")
 
             # Convert annotated image to Base64 for Flutter
             buf = BytesIO()
@@ -167,7 +163,12 @@ if img_file:
                 }}, 500);
                 </script>
             """, height=0)
-
+            #was under st image
+        if filtered_detections:
+            st.subheader("✅ Dommages confirmés:")
+            for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
+                st.markdown(f"- **{det['class_name']}** (certitude: {det['confidence']:.0%})")
+        
         else:
             st.warning("🚫 Aucun dommage significatif détecté")
             st.info("🔍 Conseils pour une meilleure détection :")
