@@ -112,7 +112,7 @@ img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 if img_file:
     try:
         image = Image.open(img_file).convert("RGB")
-       # resized_image = image.resize((920, 640))  # Keep this line
+        resized_image = image.resize((920, 640))  # Keep this line
         # PIL resize uses (width, height)
         img_array = np.array(image)
 
@@ -120,7 +120,7 @@ if img_file:
             source=img_array,
             conf=0.2,                    # Confidence threshold
             iou=0.3,                     #7 IoU threshold for NMS
-            imgsz=(img_array.shape[0], img_array.shape[1]),  # Use original image size
+            imgsz= resized_image#(img_array.shape[0], img_array.shape[1]),  # Use original image size
             device='cpu',
             augment=True,               # Enable test-time augmentation
             #max_det=100,
