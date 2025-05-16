@@ -119,10 +119,10 @@ if img_file:
         results = model.predict(
             source=img_array,
             conf=0.2,                    # Confidence threshold
-            iou=0.7,                     # IoU threshold for NMS
+            iou=0.7,                     #7 IoU threshold for NMS
             imgsz=(img_array.shape[0], img_array.shape[1]),  # Use original image size
             device='cpu',
-            augment=True,               # Enable test-time augmentation
+            #augment=True,               # Enable test-time augmentation
            # max_det=100,
             agnostic_nms=False
         )
