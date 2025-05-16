@@ -112,7 +112,7 @@ img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 if img_file:
     try:
         image = Image.open(img_file).convert("RGB")
-        target_size = (448, 640)
+        target_size = (700, 400)
         image = image.resize(target_size)  # PIL resize uses (width, height)
         img_array = np.array(image)
 
