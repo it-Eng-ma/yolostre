@@ -126,7 +126,7 @@ if img_file:
         )
 
         annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés", use_container_width=True)
+        st.image(annotated_image, caption="🛠️ Dommages détectés")#, use_container_width=True
 
         if filtered_detections:
             st.subheader("✅ Dommages confirmés:")
