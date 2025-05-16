@@ -120,7 +120,7 @@ if img_file:
             source=img_array,
             conf=0.2,                    # Confidence threshold
             iou=0.3,                     #7 IoU threshold for NMS
-            imgsz= resized_image#(img_array.shape[0], img_array.shape[1]),  # Use original image size
+            #imgsz= (img_array.shape[0], img_array.shape[1]),  # Use original image size
             device='cpu',
             augment=True,               # Enable test-time augmentation
             #max_det=100,
