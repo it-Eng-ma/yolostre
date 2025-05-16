@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 import uuid
 import base64
 from io import BytesIO
-
+st.write("OpenCV version:", cv2.__version__)
 # Generate a random filename to send to Flutter
 random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
