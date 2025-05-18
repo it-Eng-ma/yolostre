@@ -9,10 +9,10 @@ import uuid
 import base64
 from io import BytesIO
 
-# Générer un nom de fichier unique
+# Nom de fichier unique
 random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
-# Dictionnaire des classes
+# Labels des classes
 CLASS_NAMES = {
     0: "porte endommagee",
     1: "fenetre endommagee",
@@ -24,7 +24,7 @@ CLASS_NAMES = {
     7: "pare-brise endommage"
 }
 
-# Cacher les éléments UI Streamlit
+# Cacher UI Streamlit
 st.markdown("""
     <style>
         #MainMenu, footer, header {visibility: hidden;}
@@ -33,19 +33,23 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Charger le modèle
-MODEL_PATH = "yolostr/cardmg.pt"
-try:
-    model = YOLO(MODEL_PATH)
-    st.success("✅ Modèle YOLO chargé avec succès.")
-except Exception as e:
-    st.error(f"❌ Erreur de chargement du modèle: {e}")
-    st.stop()
+# Charger le modèle YOLO une seule fois (session state)
+if "model" not in st.session_state:
+    try:
+        st.session_state.model = YOLO("yolostr/cardmg.pt")
+        st.success("✅ Modèle YOLO chargé avec succès")
+    except Exception as e:
+        st.error(f"❌ Erreur de chargement du modèle: {e}")
+        st.stop()
 
-# Instructions utilisateur
-st.markdown("### 1) Prenez une photo 📸 de la zone endommagée")
-st.markdown("#### 2) Puis téléversez-la ci-dessous :")
-img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
+model = st.session_state.model
+
+# Instructions
+st.markdown("### 1) Prenez une photo 📸 de la partie endommagée 🚗")
+st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
+
+# Uploader image
+img_file = st.file_uploader("", type=["jpg", "jpeg", "png"], key="image_upload")
 
 def draw_detections(image, results):
     img_display = image.copy()
@@ -66,34 +70,33 @@ def draw_detections(image, results):
                 })
     return img_display, detections
 
-if img_file:
+# Traitement après upload
+if img_file is not None:
     try:
         image = Image.open(img_file).convert("RGB")
 
-        # Redimensionner à la taille d'entrée du modèle (640x448)
-        resized_image = image.resize((640, 448))
-        img_array = cv2.cvtColor(np.array(resized_image), cv2.COLOR_RGB2BGR)
+        resized_image = image.resize((320, 320))
+        img_array = np.array(resized_image)
 
-        # Prédiction
         results = model.predict(
             source=img_array,
             conf=0.2,
             iou=0.3,
             device='cpu',
-            imgsz=(448, 640),
-            augment=False
+            imgsz=(320, 320),
+            augment=True
         )
 
-        # Dessiner les résultats
         annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés")
 
-        # Convertir l'image annotée en base64
+        st.image(annotated_image, caption="🛠️ Dommages détectés", use_column_width=True)
+
+        # Encoder image pour Flutter (base64)
         buf = BytesIO()
         Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
         b64 = base64.b64encode(buf.getvalue()).decode()
 
-        # Envoyer l'image annotée vers Flutter
+        # JS pour Flutter WebView - Image
         components.html(f"""
             <script>
             setTimeout(function() {{
@@ -103,13 +106,13 @@ if img_file:
                 }};
                 if (window.flutter_inappwebview) {{
                     window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
-                        .then(res => console.log("✅ Annotated image sent", res));
+                        .then(res => console.log("✅ Image envoyée", res));
                 }}
             }}, 500);
             </script>
         """, height=0)
 
-        # Envoyer les résultats en JSON vers Flutter
+        # JS pour Flutter WebView - Résultats
         results_json = json.dumps(filtered_detections)
         components.html(f"""
             <script>
@@ -121,19 +124,19 @@ if img_file:
             </script>
         """, height=0)
 
-        # Résultats lisibles par l'utilisateur
+        # Résumé des résultats
         if filtered_detections:
             st.subheader("✅ Dommages détectés :")
             for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
-                st.markdown(f"- **{det['class_name']}** (certitude : {det['confidence']:.0%})")
+                st.markdown(f"- **{det['class_name']}** (certitude: {det['confidence']:.0%})")
         else:
-            st.warning("🚫 Aucun dommage significatif détecté.")
-            st.info("🔍 Astuces pour une meilleure détection :")
+            st.warning("🚫 Aucun dommage significatif détecté")
+            st.info("🔍 Astuces pour de meilleurs résultats :")
             st.markdown("""
-                • 📸 Photographiez directement la zone  
+                • 📸 Prendre la photo bien centrée  
                 • 💡 Assurez un bon éclairage  
-                • 🔍 Capturez les détails de près
+                • 🔍 Photographiez de près
             """)
 
     except Exception as e:
-        st.error(f"❌ Erreur lors de l’analyse de l’image : {str(e)}")
+        st.error(f"❌ Erreur lors du traitement de l’image : {str(e)}")
