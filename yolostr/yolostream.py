@@ -1,6 +1,5 @@
-# app.py
 import streamlit as st
-from PIL import Image, ExifTags
+from PIL import Image
 import numpy as np
 import cv2
 from ultralytics import YOLO
@@ -9,168 +8,182 @@ import streamlit.components.v1 as components
 import uuid
 import base64
 from io import BytesIO
+#st.write("OpenCV version:", cv2.__version__)
+# Generate a random filename to send to Flutter
+random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
-st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
-
-# 1) Cache the YOLO model so it's only loaded once
-@st.cache_resource
-def load_model():
-    return YOLO("yolostr/cardmg.pt")
-
-model = load_model()
-
-# 2) EXIF orientation fixer for phone images
-def apply_exif_orientation(img: Image.Image) -> Image.Image:
-    try:
-        exif = img._getexif()
-        if exif:
-            for tag, val in exif.items():
-                if ExifTags.TAGS.get(tag) == "Orientation":
-                    if val == 3:
-                        img = img.rotate(180, expand=True)
-                    elif val == 6:
-                        img = img.rotate(270, expand=True)
-                    elif val == 8:
-                        img = img.rotate(90, expand=True)
-                    break
-    except Exception:
-        pass
-    return img
-
-# 3) Draw detection boxes on a NumPy array
+# French damage classes
 CLASS_NAMES = {
-    0: "porte endommagée",
-    1: "fenêtre endommagée",
-    2: "phare endommagé",
-    3: "rétroviseur endommagé",
+    0: "porte endommagee",
+    1: "fenetre endommagee", 
+    2: "phare endommage",
+    3: "retroviseur endommage",
     4: "bosse",
-    5: "capot endommagé",
-    6: "pare-chocs endommagé",
-    7: "pare-brise endommagé"
+    5: "capot endommage",
+    6: "pare-chocs endommage",
+    7: "pare-brise endommage"
 }
 
-def draw_detections(image: np.ndarray, results) -> tuple[np.ndarray, list]:
-    img_disp = image.copy()
-    dets = []
-    for res in results:
-        for box in res.boxes:
-            conf = float(box.conf)
-            if conf < 0.2:
-                continue
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            cls_id = int(box.cls)
-            name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
-            cv2.rectangle(img_disp, (x1, y1), (x2, y2), (0,255,0), 2)
-            cv2.putText(
-                img_disp,
-                f"{name} {conf:.2f}",
-                (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0,0,255),
-                2
-            )
-            dets.append({
-                "class_name": name,
-                "confidence": round(conf, 2),
-                "coords": [x1, y1, x2, y2]
-            })
-    return img_disp, dets
+#st.markdown("""
+ #   <style> /* responsive CSS omitted for brevity */ </style>
+#""", unsafe_allow_html=True)
 
-# 4) Initialize session state
-if "last_file_id" not in st.session_state:
-    st.session_state.last_file_id = None
-if "detections" not in st.session_state:
-    st.session_state.detections = []
-if "b64_image" not in st.session_state:
-    st.session_state.b64_image = ""
-if "random_filename" not in st.session_state:
-    st.session_state.random_filename = ""
 
-# 5) File uploader & immediate rerun logic before any UI rendering
-img_file = st.file_uploader("", type=["jpg","jpeg","png"], key="image_upload")
-file_id = img_file.name if img_file is not None else None
-
-if file_id != st.session_state.last_file_id:
-    # User uploaded a new image or cleared the uploader
-    st.session_state.last_file_id = file_id
-    st.session_state.detections = []
-    st.session_state.b64_image = ""
-    st.session_state.random_filename = (
-        f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
-        if img_file else ""
-    )
-    st.rerun()
-
-# 6) Page styling
 st.markdown("""
     <style>
-        #MainMenu, footer, header {visibility: hidden;}
-        .block-container {padding: 0;}
-        html, body, .main, .stApp {height:100vh; margin:0; padding:0; overflow:hidden;}
+        /* Hide Streamlit UI elements */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+
+        /* Force app to use full screen height */
+        .block-container {
+            padding-top: 0rem;
+            padding-bottom: 0rem;
+        }
+
+        html, body, .main {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        /* Full height for mobile too */
+        .stApp {
+            height: 100vh;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("### 1) Prenez ou sélectionnez une photo de la zone endommagée")
-st.markdown("#### 2) Puis téléversez-la ci-dessous :")
 
-# 7) Once we have a new file and no detections yet, run inference
-if img_file is not None and not st.session_state.detections:
-    # Load, correct EXIF orientation, convert to RGB, resize to model input
-    pil_img = Image.open(img_file)
-    pil_img = apply_exif_orientation(pil_img)
-    pil_img = pil_img.convert("RGB")
-    pil_img = pil_img.resize((448, 640), Image.Resampling.LANCZOS)
 
-    img_arr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
-    # Run YOLO inference (augment=False for speed)
-    results = model.predict(
-        source=img_arr,
-        conf=0.2,
-        iou=0.3,
-        device='cpu',
-        imgsz=(448, 640),
-        augment=False
-    )
+# Load your YOLO model
+MODEL_PATH = "yolostr/cardmg.pt"
+try:
+    model = YOLO(MODEL_PATH)
+    st.success("Modèle chargé avec succès!")
+except Exception as e:
+    st.error(f"Erreur de chargement du modèle: {e}")
+    st.stop()
 
-    annotated, dets = draw_detections(img_arr, results)
-    st.session_state.detections = dets
+#st.title("📷 Détection de Dommages sur Véhicule")
+st.markdown("##### Détection de Dommages:")
 
-    # Encode the annotated image in base64 for WebView
-    buf = BytesIO()
-    Image.fromarray(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB))\
-         .save(buf, format="PNG")
-    st.session_state.b64_image = base64.b64encode(buf.getvalue()).decode()
-    st.session_state.random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
+def draw_detections(image, results):
+    img_display = image.copy()
+    detections = []
+    for result in results:
+        for box in result.boxes:
+            conf = float(box.conf)
+            #class_threshold = 0.1
+           # conf_class_score = float(box.cls_conf)  # or whatever variable stores class confidence
 
-# 8) Display the annotated image or a placeholder
-if st.session_state.b64_image:
-    img_to_show = Image.open(BytesIO(base64.b64decode(st.session_state.b64_image)))
-    st.image(img_to_show, caption="🛠️ Dommages détectés", use_column_width=True)
-else:
-    st.info("Aucune image sélectionnée")
+            if conf >= 0.2:
+            #if conf >= 0.9:#0.5
+                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                cls_id = int(box.cls)
+                name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
+                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0,255,0), 2)
+                cv2.putText(img_display, f"{name} {conf:.2f}",
+                            (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                detections.append({
+                    "class_name": name,
+                    "confidence": conf,
+                    "coords": [x1, y1, x2, y2]
+                })
+    return img_display, detections
 
-# 9) Send JSON payload to Flutter WebView
-payload = {
-    "base64": f"data:image/png;base64,{st.session_state.b64_image}",
-    "filename": st.session_state.random_filename,
-    "results": st.session_state.detections,
-    "clear": not bool(st.session_state.b64_image)
-}
-components.html(f"""
-<script>
-  setTimeout(() => {{
-    window.flutter_inappwebview?.callHandler('sendResults', {json.dumps(payload)});
-  }}, 100);
-</script>
-""", height=0)
 
-# 10) Show text summary of detections
-if st.session_state.detections:
-    st.subheader("✅ Dommages détectés :")
-    for d in sorted(st.session_state.detections, key=lambda x: x["confidence"], reverse=True):
-        st.markdown(f"- **{d['class_name']}** ({d['confidence']:.0%})")
-else:
-    st.warning("🚫 Aucun dommage significatif détecté")
-    st.info("🔍 Conseils : photo bien centrée, bon éclairage, de près")
+#img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
+
+       # if st.checkbox("🛠️ Afficher les détails techniques"):
+            #st.write("Total des détections potentielles:", len(results[0].boxes))
+           # st.write("Détections validées (≥20% confiance):", len(filtered_detections))
+
+
+st.markdown("###  1) Prenez une photo📸 de la partie endommagée 🚗")
+st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
+
+img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
+
+
+if img_file:
+    try:
+        image = Image.open(img_file).convert("RGB")
+        resized_image = image.resize((320, 320))  # Keep this line
+        # PIL resize uses (width, height)
+        img_array = np.array(image)
+
+        results = model.predict(
+            source=img_array,
+            conf=0.2,                    # Confidence threshold
+            iou=0.3,                     #7 IoU threshold for NMS
+            #imgsz= (img_array.shape[0], img_array.shape[1]),  # Use original image size
+            device='cpu',
+            augment=True,               # Enable test-time augmentation
+            #max_det=100,
+            agnostic_nms=False
+        )
+
+        annotated_image, filtered_detections = draw_detections(img_array, results)
+        st.image(annotated_image, caption="🛠️ Dommages détectés")  # , use_container_width=True
+
+        # Convert annotated image to Base64 for Flutter
+        buf = BytesIO()
+        Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
+        b64 = base64.b64encode(buf.getvalue()).decode()
+
+        # Send image to Flutter
+        components.html(f"""
+            <script>
+            setTimeout(function() {{
+                const payload = {{
+                    base64: "data:image/png;base64,{b64}",
+                    filename: "{random_filename}"
+                }};
+                if (window.flutter_inappwebview) {{
+                    window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
+                        .then(res => console.log("✅ Annotated image sent", res));
+                }} else {{
+                    console.warn("⚠️ Flutter interface not found.");
+                }}
+            }}, 500);
+            </script>
+        """, height=0)
+
+        # Send detections to Flutter
+        results_json = json.dumps(filtered_detections)
+        components.html(f"""
+            <script>
+            setTimeout(function() {{
+                if (window.flutter_inappwebview) {{
+                    window.flutter_inappwebview.callHandler('sendResults', {results_json});
+                }}
+            }}, 500);
+            </script>
+        """, height=0)
+
+        if filtered_detections:
+            st.subheader("✅ Dommages confirmés:")
+            for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
+                st.markdown(f"- **{det['class_name']}** (certitude: {det['confidence']:.0%})")
+        else:
+            st.warning("🚫 Aucun dommage significatif détecté")
+            st.info("🔍 Conseils pour une meilleure détection :")
+            st.markdown("""
+                • 📸 Photographiez sous un angle direct  
+                • 💡 Assurez un bon éclairage  
+                • 🔍 Capturez les détails de près
+            """)
+
+    except Exception as e:
+        st.error(f"❌ Erreur lors de l’analyse de l’image : {str(e)}")
+
+
+
+
+
+
+
