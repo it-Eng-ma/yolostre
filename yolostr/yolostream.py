@@ -8,14 +8,14 @@ import streamlit.components.v1 as components
 import uuid
 import base64
 from io import BytesIO
-#st.write("OpenCV version:", cv2.__version__)
-# Generate a random filename to send to Flutter
+
+# Random filename for saving annotated images
 random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
-# French damage classes
+# Class labels
 CLASS_NAMES = {
     0: "porte endommagee",
-    1: "fenetre endommagee", 
+    1: "fenetre endommagee",
     2: "phare endommage",
     3: "retroviseur endommage",
     4: "bosse",
@@ -24,42 +24,16 @@ CLASS_NAMES = {
     7: "pare-brise endommage"
 }
 
-#st.markdown("""
- #   <style> /* responsive CSS omitted for brevity */ </style>
-#""", unsafe_allow_html=True)
-
-
+# Hide Streamlit UI elements for fullscreen experience
 st.markdown("""
     <style>
-        /* Hide Streamlit UI elements */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-
-        /* Force app to use full screen height */
-        .block-container {
-            padding-top: 0rem;
-            padding-bottom: 0rem;
-        }
-
-        html, body, .main {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-
-        /* Full height for mobile too */
-        .stApp {
-            height: 100vh;
-        }
+        #MainMenu, footer, header {visibility: hidden;}
+        .block-container {padding-top: 0rem; padding-bottom: 0rem;}
+        html, body, .main, .stApp {height: 100vh; margin: 0; padding: 0; overflow: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-
-
-
-# Load your YOLO model
+# Load YOLO model
 MODEL_PATH = "yolostr/cardmg.pt"
 try:
     model = YOLO(MODEL_PATH)
@@ -68,8 +42,10 @@ except Exception as e:
     st.error(f"Erreur de chargement du modèle: {e}")
     st.stop()
 
-#st.title("📷 Détection de Dommages sur Véhicule")
-st.markdown("##### Détection de Dommages:")
+# UI
+st.markdown("###  1) Prenez une photo📸 de la partie endommagée 🚗")
+st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
+img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 
 def draw_detections(image, results):
     img_display = image.copy()
@@ -77,17 +53,12 @@ def draw_detections(image, results):
     for result in results:
         for box in result.boxes:
             conf = float(box.conf)
-            #class_threshold = 0.1
-           # conf_class_score = float(box.cls_conf)  # or whatever variable stores class confidence
-
             if conf >= 0.2:
-            #if conf >= 0.9:#0.5
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
                 cv2.rectangle(img_display, (x1, y1), (x2, y2), (0,255,0), 2)
-                cv2.putText(img_display, f"{name} {conf:.2f}",
-                            (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+                cv2.putText(img_display, f"{name} {conf:.2f}", (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
                 detections.append({
                     "class_name": name,
                     "confidence": conf,
@@ -95,47 +66,32 @@ def draw_detections(image, results):
                 })
     return img_display, detections
 
-
-#img_file = st.file_uploader("📸 1) Prenez une photo de la partie endommagée du véhicule PUIS", type=["jpg","jpeg","png"])
-
-       # if st.checkbox("🛠️ Afficher les détails techniques"):
-            #st.write("Total des détections potentielles:", len(results[0].boxes))
-           # st.write("Détections validées (≥20% confiance):", len(filtered_detections))
-
-
-st.markdown("###  1) Prenez une photo📸 de la partie endommagée 🚗")
-st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
-
-img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
-
-
 if img_file:
     try:
         image = Image.open(img_file).convert("RGB")
-        resized_image = image.resize((320, 320))  # Keep this line
-        # PIL resize uses (width, height)
-        img_array = np.array(image)
+
+        # 🔁 Resize to model expected input size: (width=448, height=640)
+        resized_image = image.resize((448, 640))  # PIL resize is (width, height)
+        img_array = np.array(resized_image)
 
         results = model.predict(
             source=img_array,
-            conf=0.2,                    # Confidence threshold
-            iou=0.3,                     #7 IoU threshold for NMS
-            #imgsz= (img_array.shape[0], img_array.shape[1]),  # Use original image size
+            conf=0.2,
+            iou=0.3,
             device='cpu',
-            augment=True,               # Enable test-time augmentation
-            #max_det=100,
-            agnostic_nms=False
+            imgsz=(640, 448),  # (height, width) expected by YOLO inference
+            augment=True
         )
 
         annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés")  # , use_container_width=True
+        st.image(annotated_image, caption="🛠️ Dommages détectés")
 
-        # Convert annotated image to Base64 for Flutter
+        # Convert to base64 for Flutter
         buf = BytesIO()
         Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
         b64 = base64.b64encode(buf.getvalue()).decode()
 
-        # Send image to Flutter
+        # Send annotated image to Flutter
         components.html(f"""
             <script>
             setTimeout(function() {{
@@ -146,14 +102,12 @@ if img_file:
                 if (window.flutter_inappwebview) {{
                     window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
                         .then(res => console.log("✅ Annotated image sent", res));
-                }} else {{
-                    console.warn("⚠️ Flutter interface not found.");
                 }}
             }}, 500);
             </script>
         """, height=0)
 
-        # Send detections to Flutter
+        # Send detection results to Flutter
         results_json = json.dumps(filtered_detections)
         components.html(f"""
             <script>
@@ -180,10 +134,3 @@ if img_file:
 
     except Exception as e:
         st.error(f"❌ Erreur lors de l’analyse de l’image : {str(e)}")
-
-
-
-
-
-
-
