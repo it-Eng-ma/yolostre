@@ -75,7 +75,7 @@ if img_file is not None:
     try:
         image = Image.open(img_file).convert("RGB")
 
-        resized_image = image.resize((4160,3120))#((640 ,448))(4400,3338)
+        resized_image = image.resize((4500,4500))#((640 ,448))(4400,3338)
         img_array = np.array(resized_image)
 
         results = model.predict(
@@ -84,8 +84,10 @@ if img_file is not None:
             iou=0.3,
             device='cpu',
             imgsz=(285, 285),#280
-            augment=False
+            augment=True
         )
+
+
 
         annotated_image, filtered_detections = draw_detections(img_array, results)
 
