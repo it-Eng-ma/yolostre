@@ -77,7 +77,7 @@ if img_file:
         results = model.predict(
             source=img_array,
             conf=0.2,
-            iou=0.3,
+            iou=0.7,
             device='cpu',
             imgsz=(640, 448),  # (height, width) expected by YOLO inference
             augment=True
