@@ -9,19 +9,22 @@ import uuid
 import base64
 from io import BytesIO
 
-# ---------- Configuration ----------
+# Générer un nom de fichier unique
+random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
+
+# Dictionnaire des classes
 CLASS_NAMES = {
-    0: "porte endommagée",
-    1: "fenêtre endommagée",
-    2: "phare endommagé",
-    3: "rétroviseur endommagé",
+    0: "porte endommagee",
+    1: "fenetre endommagee",
+    2: "phare endommage",
+    3: "retroviseur endommage",
     4: "bosse",
-    5: "capot endommagé",
-    6: "pare-chocs endommagé",
-    7: "pare-brise endommagé"
+    5: "capot endommage",
+    6: "pare-chocs endommage",
+    7: "pare-brise endommage"
 }
 
-# Design fullscreen
+# Cacher les éléments UI Streamlit
 st.markdown("""
     <style>
         #MainMenu, footer, header {visibility: hidden;}
@@ -30,16 +33,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ---------- Load Model ----------
+# Charger le modèle
 MODEL_PATH = "yolostr/cardmg.pt"
 try:
     model = YOLO(MODEL_PATH)
-    st.success("✅ Modèle YOLO chargé avec succès")
+    st.success("✅ Modèle YOLO chargé avec succès.")
 except Exception as e:
-    st.error(f"❌ Erreur de chargement du modèle : {e}")
+    st.error(f"❌ Erreur de chargement du modèle: {e}")
     st.stop()
 
-# ---------- Detection Function ----------
+# Instructions utilisateur
+st.markdown("### 1) Prenez une photo 📸 de la zone endommagée")
+st.markdown("#### 2) Puis téléversez-la ci-dessous :")
+img_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
+
 def draw_detections(image, results):
     img_display = image.copy()
     detections = []
@@ -50,8 +57,8 @@ def draw_detections(image, results):
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 cls_id = int(box.cls)
                 name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
-                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(img_display, f"{name} {conf:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                cv2.rectangle(img_display, (x1, y1), (x2, y2), (0,255,0), 2)
+                cv2.putText(img_display, f"{name} {conf:.2f}", (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
                 detections.append({
                     "class_name": name,
                     "confidence": conf,
@@ -59,38 +66,34 @@ def draw_detections(image, results):
                 })
     return img_display, detections
 
-# ---------- UI ----------
-st.markdown("### 1️⃣ Prenez une photo 📸 de la partie endommagée 🚗")
-st.markdown("### 2️⃣ Téléversez-la ci-dessous 👇")
-
-img_file = st.file_uploader("Choisissez une image", type=["jpg", "jpeg", "png"])
-
 if img_file:
     try:
-        st.image(img_file, caption="📥 Image téléchargée", use_column_width=True)
-
         image = Image.open(img_file).convert("RGB")
-        resized_image = image.resize((320, 320))
+
+        # Redimensionner à la taille d'entrée du modèle (640x448)
+        resized_image = image.resize((640, 448))
         img_array = cv2.cvtColor(np.array(resized_image), cv2.COLOR_RGB2BGR)
 
+        # Prédiction
         results = model.predict(
             source=img_array,
             conf=0.2,
             iou=0.3,
             device='cpu',
-            imgsz=(320, 320),
-            augment=True
+            imgsz=(448, 640),
+            augment=False
         )
 
+        # Dessiner les résultats
         annotated_image, filtered_detections = draw_detections(img_array, results)
-        st.image(annotated_image, caption="🛠️ Dommages détectés", use_column_width=True)
+        st.image(annotated_image, caption="🛠️ Dommages détectés")
 
-        # ---- Base64 for Flutter ----
+        # Convertir l'image annotée en base64
         buf = BytesIO()
         Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
         b64 = base64.b64encode(buf.getvalue()).decode()
-        random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
+        # Envoyer l'image annotée vers Flutter
         components.html(f"""
             <script>
             setTimeout(function() {{
@@ -104,8 +107,9 @@ if img_file:
                 }}
             }}, 500);
             </script>
-        """, height=0, key="send_image_"+str(uuid.uuid4()))
+        """, height=0)
 
+        # Envoyer les résultats en JSON vers Flutter
         results_json = json.dumps(filtered_detections)
         components.html(f"""
             <script>
@@ -115,21 +119,21 @@ if img_file:
                 }}
             }}, 500);
             </script>
-        """, height=0, key="send_results_"+str(uuid.uuid4()))
+        """, height=0)
 
-        # ---- Résultats dans Streamlit
+        # Résultats lisibles par l'utilisateur
         if filtered_detections:
-            st.subheader("✅ Dommages confirmés :")
+            st.subheader("✅ Dommages détectés :")
             for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
                 st.markdown(f"- **{det['class_name']}** (certitude : {det['confidence']:.0%})")
         else:
-            st.warning("🚫 Aucun dommage significatif détecté")
-            st.info("🔍 Conseils pour une meilleure détection :")
+            st.warning("🚫 Aucun dommage significatif détecté.")
+            st.info("🔍 Astuces pour une meilleure détection :")
             st.markdown("""
-                • 📸 Photographiez sous un angle direct  
+                • 📸 Photographiez directement la zone  
                 • 💡 Assurez un bon éclairage  
                 • 🔍 Capturez les détails de près
             """)
 
     except Exception as e:
-        st.error(f"❌ Erreur lors de l’analyse de l’image : {e}")
+        st.error(f"❌ Erreur lors de l’analyse de l’image : {str(e)}")
