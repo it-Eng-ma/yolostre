@@ -75,7 +75,7 @@ if img_file is not None:
     try:
         image = Image.open(img_file).convert("RGB")
 
-        resized_image = image.resize((300, 300))
+        resized_image = image.resize((400, 400))
         img_array = np.array(resized_image)
 
         results = model.predict(
@@ -83,7 +83,7 @@ if img_file is not None:
             conf=0.2,
             iou=0.3,
             device='cpu',
-            imgsz=(300, 300),
+            imgsz=(400, 400),
             augment=True
         )
 
