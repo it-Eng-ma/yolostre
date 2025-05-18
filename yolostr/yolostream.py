@@ -83,7 +83,7 @@ if img_file is not None:
             conf=0.2,
             iou=0.3,
             device='cpu',
-            imgsz=(448, 448),
+            imgsz=(320, 320),
             #augment=True
         )
 
