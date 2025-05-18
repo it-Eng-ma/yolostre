@@ -81,9 +81,9 @@ if img_file is not None:
         results = model.predict(
             source=img_array,
             conf=0.2,
-            iou=0.2,
+            iou=0.3,
             device='cpu',
-            imgsz=(270, 270),#280
+            imgsz=(250, 250),#280
             augment=True
         )
 
