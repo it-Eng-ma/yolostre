@@ -167,7 +167,7 @@ if st.session_state.detections:
         st.markdown(f"- **{d['class_name']}** ({d['confidence']:.0%})")
 else:
     st.warning("🚫 Aucun dommage significatif détecté")
-    st.info("🔍 Conseils : prenez la photo bien centrée, bon éclairage et de pr
+    st.info("🔍 Conseils : prenez la photo bien centrée, bon éclairage et de près")
 
 
 
