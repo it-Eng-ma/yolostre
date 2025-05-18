@@ -84,7 +84,7 @@ if img_file is not None:
             iou=0.3,
             device='cpu',
             imgsz=(448, 448),
-            augment=True
+            #augment=True
         )
 
         annotated_image, filtered_detections = draw_detections(img_array, results)
