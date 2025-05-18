@@ -11,14 +11,14 @@ from io import BytesIO
 
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 
-# 1) Cache the YOLO model so it's loaded only once
+# 1) Cache the YOLO model so it’s only loaded once
 @st.cache_resource
 def load_model():
     return YOLO("yolostr/cardmg.pt")
 
 model = load_model()
 
-# 2) EXIF orientation fixer
+# 2) EXIF orientation fixer for phone images
 def apply_exif_orientation(img: Image.Image) -> Image.Image:
     try:
         exif = img._getexif()
@@ -36,7 +36,7 @@ def apply_exif_orientation(img: Image.Image) -> Image.Image:
         pass
     return img
 
-# 3) Draw detection boxes
+# 3) Draw detection boxes on a NumPy array
 CLASS_NAMES = {
     0: "porte endommagée",
     1: "fenêtre endommagée",
@@ -60,13 +60,15 @@ def draw_detections(image: np.ndarray, results) -> tuple[np.ndarray, list]:
             cls_id = int(box.cls)
             name = CLASS_NAMES.get(cls_id, f"inconnu {cls_id}")
             cv2.rectangle(img_disp, (x1, y1), (x2, y2), (0,255,0), 2)
-            cv2.putText(img_disp,
-                        f"{name} {conf:.2f}",
-                        (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (0,0,255),
-                        2)
+            cv2.putText(
+                img_disp,
+                f"{name} {conf:.2f}",
+                (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (0,0,255),
+                2
+            )
             dets.append({
                 "class_name": name,
                 "confidence": round(conf, 2),
@@ -74,7 +76,7 @@ def draw_detections(image: np.ndarray, results) -> tuple[np.ndarray, list]:
             })
     return img_disp, dets
 
-# 4) Session-state initialization
+# 4) Initialize session state
 if "last_file_id" not in st.session_state:
     st.session_state.last_file_id = None
 if "detections" not in st.session_state:
@@ -84,34 +86,37 @@ if "b64_image" not in st.session_state:
 if "random_filename" not in st.session_state:
     st.session_state.random_filename = ""
 
-# 5) UI styling
+# 5) File uploader & immediate rerun logic before any UI rendering
+img_file = st.file_uploader("", type=["jpg","jpeg","png"], key="image_upload")
+file_id = img_file.name if img_file is not None else None
+
+if file_id != st.session_state.last_file_id:
+    # User uploaded a new image or cleared the uploader
+    st.session_state.last_file_id = file_id
+    st.session_state.detections = []
+    st.session_state.b64_image = ""
+    st.session_state.random_filename = (
+        f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
+        if img_file else ""
+    )
+    st.experimental_rerun()
+    st.stop()
+
+# 6) Page styling
 st.markdown("""
     <style>
         #MainMenu, footer, header {visibility: hidden;}
-        .block-container {padding-top: 0; padding-bottom: 0;}
+        .block-container {padding: 0;}
         html, body, .main, .stApp {height:100vh; margin:0; padding:0; overflow:hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("### 1) Prenez ou sélectionnez une photo de la partie endommagée")
+st.markdown("### 1) Prenez ou sélectionnez une photo de la zone endommagée")
 st.markdown("#### 2) Puis téléversez-la ci-dessous :")
 
-# 6) File uploader
-img_file = st.file_uploader("", type=["jpg","jpeg","png"], key="image_upload")
-file_id = img_file.name if img_file else None
-
-# 7) If the user changed or cleared the upload, reset state and rerun
-if file_id != st.session_state.last_file_id:
-    st.session_state.last_file_id = file_id
-    st.session_state.detections = []
-    st.session_state.b64_image = ""
-    st.session_state.random_filename = (f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
-                                        if img_file else "")
-    st.experimental_rerun()
-
-# 8) When a new file is present and no detections yet, run inference
-if img_file and not st.session_state.detections:
-    # Load + fix orientation + convert + resize
+# 7) Once we have a new file and no detections yet, run inference
+if img_file is not None and not st.session_state.detections:
+    # Load, correct EXIF orientation, convert to RGB, resize to model input
     pil_img = Image.open(img_file)
     pil_img = apply_exif_orientation(pil_img)
     pil_img = pil_img.convert("RGB")
@@ -119,7 +124,7 @@ if img_file and not st.session_state.detections:
 
     img_arr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
-    # Inference (no augment for speed)
+    # Run YOLO inference (augment=False for speed)
     results = model.predict(
         source=img_arr,
         conf=0.2,
@@ -132,20 +137,21 @@ if img_file and not st.session_state.detections:
     annotated, dets = draw_detections(img_arr, results)
     st.session_state.detections = dets
 
-    # Encode annotated image to base64
+    # Encode the annotated image in base64 for WebView
     buf = BytesIO()
-    Image.fromarray(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)).save(buf, format="PNG")
+    Image.fromarray(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB))\
+         .save(buf, format="PNG")
     st.session_state.b64_image = base64.b64encode(buf.getvalue()).decode()
     st.session_state.random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
 
-# 9) Display the annotated image or placeholder
+# 8) Display the annotated image or a placeholder
 if st.session_state.b64_image:
     img_to_show = Image.open(BytesIO(base64.b64decode(st.session_state.b64_image)))
     st.image(img_to_show, caption="🛠️ Dommages détectés", use_column_width=True)
 else:
     st.info("Aucune image sélectionnée")
 
-# 10) Send results to Flutter WebView
+# 9) Send JSON payload to Flutter WebView
 payload = {
     "base64": f"data:image/png;base64,{st.session_state.b64_image}",
     "filename": st.session_state.random_filename,
@@ -160,22 +166,11 @@ components.html(f"""
 </script>
 """, height=0)
 
-# 11) Text summary of detections
+# 10) Show text summary of detections
 if st.session_state.detections:
     st.subheader("✅ Dommages détectés :")
     for d in sorted(st.session_state.detections, key=lambda x: x["confidence"], reverse=True):
         st.markdown(f"- **{d['class_name']}** ({d['confidence']:.0%})")
 else:
     st.warning("🚫 Aucun dommage significatif détecté")
-    st.info("🔍 Conseils : prenez la photo bien centrée, bon éclairage et de près")
-
-
-
-
-
-
-
-
-
-
-
+    st.info("🔍 Conseils : photo bien centrée, bon éclairage, de près")
