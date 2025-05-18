@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 from PIL import Image, ExifTags
 import numpy as np
@@ -11,7 +12,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 
-# 1) Cache the YOLO model so it’s only loaded once
+# 1) Cache the YOLO model so it's only loaded once
 @st.cache_resource
 def load_model():
     return YOLO("yolostr/cardmg.pt")
@@ -99,8 +100,7 @@ if file_id != st.session_state.last_file_id:
         f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
         if img_file else ""
     )
-    st.experimental_rerun()
-    st.stop()
+    st.rerun()
 
 # 6) Page styling
 st.markdown("""
@@ -120,7 +120,7 @@ if img_file is not None and not st.session_state.detections:
     pil_img = Image.open(img_file)
     pil_img = apply_exif_orientation(pil_img)
     pil_img = pil_img.convert("RGB")
-    pil_img = pil_img.resize((448, 640), Image.ANTIALIAS)
+    pil_img = pil_img.resize((448, 640), Image.Resampling.LANCZOS)
 
     img_arr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
