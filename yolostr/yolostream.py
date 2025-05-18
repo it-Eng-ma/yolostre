@@ -71,7 +71,7 @@ if img_file:
         image = Image.open(img_file).convert("RGB")
 
         # 🔁 Resize to model expected input size: (width=448, height=640)
-        resized_image = image.resize((448, 640))  # PIL resize is (width, height)
+        resized_image = image.resize((320, 320))  # PIL resize is (width, height)
         img_array = np.array(resized_image)
 
         results = model.predict(
@@ -79,7 +79,7 @@ if img_file:
             conf=0.2,
             iou=0.3,
             device='cpu',
-            imgsz=(448, 640),  # (height, width) expected by YOLO inference
+            imgsz=(320, 320),  # (height, width) expected by YOLO inference
             augment=True
         )
 
