@@ -75,7 +75,7 @@ if img_file is not None:
     try:
         image = Image.open(img_file).convert("RGB")
 
-        resized_image = image.resize((640 ,448))
+        resized_image = image.resize((448,640))#((640 ,448))
         img_array = np.array(resized_image)
 
         results = model.predict(
