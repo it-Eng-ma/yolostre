@@ -21,7 +21,7 @@ CLASS_NAMES = {
     7: "pare-brise endommagé"
 }
 
-# Design plein écran
+# Design fullscreen
 st.markdown("""
     <style>
         #MainMenu, footer, header {visibility: hidden;}
@@ -30,7 +30,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ---------- Chargement du modèle ----------
+# ---------- Load Model ----------
 MODEL_PATH = "yolostr/cardmg.pt"
 try:
     model = YOLO(MODEL_PATH)
@@ -39,7 +39,7 @@ except Exception as e:
     st.error(f"❌ Erreur de chargement du modèle : {e}")
     st.stop()
 
-# ---------- Fonctions ----------
+# ---------- Detection Function ----------
 def draw_detections(image, results):
     img_display = image.copy()
     detections = []
@@ -59,75 +59,77 @@ def draw_detections(image, results):
                 })
     return img_display, detections
 
-def process_image(img_file):
-    random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
-    image = Image.open(img_file).convert("RGB")
-    resized_image = image.resize((320, 320))
-    img_array = cv2.cvtColor(np.array(resized_image), cv2.COLOR_RGB2BGR)
-
-    results = model.predict(
-        source=img_array,
-        conf=0.2,
-        iou=0.3,
-        device='cpu',
-        imgsz=(320, 320),
-        augment=True
-    )
-
-    annotated_image, filtered_detections = draw_detections(img_array, results)
-    st.image(annotated_image, caption="🛠️ Dommages détectés", use_column_width=True)
-
-    # ----- Base64 pour Flutter -----
-    buf = BytesIO()
-    Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
-    b64 = base64.b64encode(buf.getvalue()).decode()
-
-    components.html(f"""
-        <script>
-        setTimeout(function() {{
-            const payload = {{
-                base64: "data:image/png;base64,{b64}",
-                filename: "{random_filename}"
-            }};
-            if (window.flutter_inappwebview) {{
-                window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
-                    .then(res => console.log("✅ Annotated image sent", res));
-            }}
-        }}, 500);
-        </script>
-    """, height=0, key="send_image_"+str(uuid.uuid4()))
-
-    results_json = json.dumps(filtered_detections)
-    components.html(f"""
-        <script>
-        setTimeout(function() {{
-            if (window.flutter_inappwebview) {{
-                window.flutter_inappwebview.callHandler('sendResults', {results_json});
-            }}
-        }}, 500);
-        </script>
-    """, height=0, key="send_results_"+str(uuid.uuid4()))
-
-    if filtered_detections:
-        st.subheader("✅ Dommages confirmés :")
-        for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
-            st.markdown(f"- **{det['class_name']}** (certitude : {det['confidence']:.0%})")
-    else:
-        st.warning("🚫 Aucun dommage significatif détecté")
-        st.info("🔍 Conseils pour une meilleure détection :")
-        st.markdown("""
-            • 📸 Photographiez sous un angle direct  
-            • 💡 Assurez un bon éclairage  
-            • 🔍 Capturez les détails de près
-        """)
-
-# ---------- Interface Utilisateur ----------
+# ---------- UI ----------
 st.markdown("### 1️⃣ Prenez une photo 📸 de la partie endommagée 🚗")
 st.markdown("### 2️⃣ Téléversez-la ci-dessous 👇")
 
 img_file = st.file_uploader("Choisissez une image", type=["jpg", "jpeg", "png"])
 
 if img_file:
-    st.image(img_file, caption="Image téléchargée", use_column_width=True)
-    if st.button("Analyser l'image"):
-        process_image(img_file)
+    try:
+        st.image(img_file, caption="📥 Image téléchargée", use_column_width=True)
+
+        image = Image.open(img_file).convert("RGB")
+        resized_image = image.resize((320, 320))
+        img_array = cv2.cvtColor(np.array(resized_image), cv2.COLOR_RGB2BGR)
+
+        results = model.predict(
+            source=img_array,
+            conf=0.2,
+            iou=0.3,
+            device='cpu',
+            imgsz=(320, 320),
+            augment=True
+        )
+
+        annotated_image, filtered_detections = draw_detections(img_array, results)
+        st.image(annotated_image, caption="🛠️ Dommages détectés", use_column_width=True)
+
+        # ---- Base64 for Flutter ----
+        buf = BytesIO()
+        Image.fromarray(cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)).save(buf, format='PNG')
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        random_filename = f"dommages_detectes_{uuid.uuid4().hex[:8]}.png"
+
+        components.html(f"""
+            <script>
+            setTimeout(function() {{
+                const payload = {{
+                    base64: "data:image/png;base64,{b64}",
+                    filename: "{random_filename}"
+                }};
+                if (window.flutter_inappwebview) {{
+                    window.flutter_inappwebview.callHandler('sendAnnotatedImage', payload)
+                        .then(res => console.log("✅ Annotated image sent", res));
+                }}
+            }}, 500);
+            </script>
+        """, height=0, key="send_image_"+str(uuid.uuid4()))
+
+        results_json = json.dumps(filtered_detections)
+        components.html(f"""
+            <script>
+            setTimeout(function() {{
+                if (window.flutter_inappwebview) {{
+                    window.flutter_inappwebview.callHandler('sendResults', {results_json});
+                }}
+            }}, 500);
+            </script>
+        """, height=0, key="send_results_"+str(uuid.uuid4()))
+
+        # ---- Résultats dans Streamlit
+        if filtered_detections:
+            st.subheader("✅ Dommages confirmés :")
+            for det in sorted(filtered_detections, key=lambda x: x["confidence"], reverse=True):
+                st.markdown(f"- **{det['class_name']}** (certitude : {det['confidence']:.0%})")
+        else:
+            st.warning("🚫 Aucun dommage significatif détecté")
+            st.info("🔍 Conseils pour une meilleure détection :")
+            st.markdown("""
+                • 📸 Photographiez sous un angle direct  
+                • 💡 Assurez un bon éclairage  
+                • 🔍 Capturez les détails de près
+            """)
+
+    except Exception as e:
+        st.error(f"❌ Erreur lors de l’analyse de l’image : {e}")
