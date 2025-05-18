@@ -46,7 +46,7 @@ model = st.session_state.model
 
 # Instructions
 st.markdown("### 1) Prenez une photo 📸 de la partie endommagée 🚗")
-st.markdown("#### _2) Puis téléversez-la ci-dessous :_")
+st.markdown("#### _2) Puis téléversez-la ci-dessous_")
 
 # Uploader image
 img_file = st.file_uploader("", type=["jpg", "jpeg", "png"], key="image_upload")
